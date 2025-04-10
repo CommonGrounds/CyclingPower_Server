@@ -1,0 +1,1 @@
+web: java -jar target/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar
