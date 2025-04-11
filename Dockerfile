@@ -9,6 +9,6 @@ FROM openjdk:19-jdk
 VOLUME /tmp
 
 # Copy the JAR from the build stage
-COPY --from=build target/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+COPY --from=build target/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar
+ENTRYPOINT ["java","-jar","/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar"]
 EXPOSE 8080
