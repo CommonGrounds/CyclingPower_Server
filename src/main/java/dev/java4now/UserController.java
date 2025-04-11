@@ -314,7 +314,7 @@ public class UserController {
         List<String> signedUrls = imageFilenames.stream()
                 .map(filename -> {
                     String token = generateToken(username);
-                    return "http://localhost:8880/api/images/" + filename + "?token=" + token;
+                    return "https://cyclingpower-server-1.onrender.com/api/images/" + filename + "?token=" + token;
                 })
                 .collect(Collectors.toList());
 
