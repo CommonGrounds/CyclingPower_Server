@@ -1,13 +1,12 @@
-#
 # Build stage
-#
-FROM maven:3.8.2-jdk-11 AS build
+FROM maven:3.8.6-openjdk-17 AS build
+WORKDIR /app
 COPY . .
 RUN mvn clean package -DskipTests
 
-
-# Copy the JAR from the build stage
-FROM openjdk:19-jdk AS build
-COPY --from=build target/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar
-ENTRYPOINT ["java","-jar","CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar"]
+# Runtime stage
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
