@@ -8,8 +8,10 @@ RUN mvn clean package -DskipTests
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+COPY cycling_power.db /app/cycling_power.db  # Explicitly copy DB file
+RUN ls -l /app/cycling_power.db || echo "DB file not found"
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
 # sudo dockerd
