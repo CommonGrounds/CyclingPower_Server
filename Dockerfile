@@ -10,7 +10,10 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Explicitly copy DB file
 COPY cycling_power.db /app/cycling_power.db
+# Copy the entire json folder
+COPY json /app/json
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
+RUN ls -l /app/json || echo "json folder not found"
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
