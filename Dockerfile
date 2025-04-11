@@ -8,7 +8,8 @@ RUN mvn clean package -DskipTests
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
-COPY cycling_power.db /app/cycling_power.db  # Explicitly copy DB file
+# Explicitly copy DB file
+COPY cycling_power.db /app/cycling_power.db
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
