@@ -6,7 +6,7 @@ COPY src src
 
 # Stage 2: Create the final Docker image using OpenJDK 19
 FROM openjdk:19-jdk
-VOLUME /tmp
+VOLUME /target
 
 # Copy the JAR from the build stage
 COPY --from=build target/CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar CyclingPower_Server_SQL_Clone-1.0-SNAPSHOT.jar
