@@ -1,8 +1,9 @@
-# Importing JDK and copying required files
-FROM openjdk:19-jdk AS build
-WORKDIR /app
-COPY pom.xml .
-COPY src src
+#
+# Build stage
+#
+FROM maven:3.8.2-jdk-11 AS build
+COPY . .
+RUN mvn clean package -DskipTests
 
 
 # Copy the JAR from the build stage
