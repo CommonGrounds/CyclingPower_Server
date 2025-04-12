@@ -77,7 +77,7 @@ public class DebugController {
 
     @PostMapping("/api/upload-db")
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
-        file.transferTo(new File("./app/cycling_power.db"));
+        file.transferTo(new File("./cycling_power.db"));
         return ResponseEntity.ok("Database uploaded");
     }
 }
