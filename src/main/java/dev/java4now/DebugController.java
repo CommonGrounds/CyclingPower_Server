@@ -1,11 +1,21 @@
 package dev.java4now;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.sql.DataSource;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.SQLException;
 
 @RestController
@@ -51,5 +61,23 @@ public class DebugController {
         } catch (Exception e) {
             return "Error querying database: " + e.getMessage();
         }
+    }
+
+
+    @GetMapping("/api/download-db")
+    public ResponseEntity<Resource> downloadDb() throws IOException {
+        File file = new File("./cycling_power.db");
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cycling_power.db")
+                .contentLength(file.length())
+                .body(resource);
+    }
+
+
+    @PostMapping("/api/upload-db")
+    public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
+        file.transferTo(new File("./cycling_power.db"));
+        return ResponseEntity.ok("Database uploaded");
     }
 }
