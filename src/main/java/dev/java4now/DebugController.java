@@ -1,6 +1,7 @@
 package dev.java4now;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -11,6 +12,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
 
 import javax.sql.DataSource;
 import java.io.File;
@@ -18,10 +23,24 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+
 @RestController
 public class DebugController {
     @Autowired
     private DataSource dataSource;
+    private static final String JSON_DIR = "json/";
+    private static final String IMAGE_DIR = "images/";
+    private static final String UPLOAD_DIR = "Uploads/";
+    private static final String DB_PATH = "cycling_power.db";
 
     @GetMapping("/api/debug-db")
     public String debugDatabase() {
@@ -79,5 +98,82 @@ public class DebugController {
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
         file.transferTo(new File("./cycling_power.db"));
         return ResponseEntity.ok("Database uploaded");
+    }
+
+
+    @GetMapping("/backup-json")
+    public ResponseEntity<Resource> backupJsonFiles(Authentication authentication) throws IOException {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
+        String username = authentication.getName();
+        Path jsonDir = Paths.get(JSON_DIR);
+
+        // Create a ZIP in memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            if (Files.exists(jsonDir) && Files.isDirectory(jsonDir)) {
+                List<Path> jsonFiles = Files.list(jsonDir)
+                        .filter(path -> path.getFileName().toString().startsWith(username + "_") && path.getFileName().toString().endsWith(".json"))
+                        .collect(Collectors.toList());
+
+                for (Path filePath : jsonFiles) {
+                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+
+        byte[] zipBytes = baos.toByteArray();
+        if (zipBytes.length == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No files for user
+        }
+
+        Resource resource = new ByteArrayResource(zipBytes);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=json_backup_" + username + ".zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
+
+    @GetMapping("/backup-images")
+    public ResponseEntity<Resource> backupImageFiles(Authentication authentication) throws IOException {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
+        String username = authentication.getName();
+        Path imageDir = Paths.get(IMAGE_DIR);
+
+        // Create a ZIP in memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
+                List<Path> imageFiles = Files.list(imageDir)
+                        .filter(path -> path.getFileName().toString().startsWith(username + "_"))
+                        .collect(Collectors.toList());
+
+                for (Path filePath : imageFiles) {
+                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+
+        byte[] zipBytes = baos.toByteArray();
+        if (zipBytes.length == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No files for user
+        }
+
+        Resource resource = new ByteArrayResource(zipBytes);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=images_backup_" + username + ".zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 }
