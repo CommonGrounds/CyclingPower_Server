@@ -101,13 +101,12 @@ public class DebugController {
     }
 
 
-    @GetMapping("/backup-json")
-    public ResponseEntity<Resource> backupJsonFiles(Authentication authentication) throws IOException {
+    @GetMapping("/backup-all-json")
+    public ResponseEntity<Resource> backupAllJsonFiles(Authentication authentication) throws IOException {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
-        String username = authentication.getName();
         Path jsonDir = Paths.get(JSON_DIR);
 
         // Create a ZIP in memory
@@ -115,7 +114,7 @@ public class DebugController {
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             if (Files.exists(jsonDir) && Files.isDirectory(jsonDir)) {
                 List<Path> jsonFiles = Files.list(jsonDir)
-                        .filter(path -> path.getFileName().toString().startsWith(username + "_") && path.getFileName().toString().endsWith(".json"))
+                        .filter(path -> path.getFileName().toString().endsWith(".json"))
                         .collect(Collectors.toList());
 
                 for (Path filePath : jsonFiles) {
@@ -129,23 +128,22 @@ public class DebugController {
 
         byte[] zipBytes = baos.toByteArray();
         if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No files for user
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No JSON files
         }
 
         Resource resource = new ByteArrayResource(zipBytes);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=json_backup_" + username + ".zip")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_json_backup.zip")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
 
-    @GetMapping("/backup-images")
-    public ResponseEntity<Resource> backupImageFiles(Authentication authentication) throws IOException {
+    @GetMapping("/backup-all-images")
+    public ResponseEntity<Resource> backupAllImageFiles(Authentication authentication) throws IOException {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
-        String username = authentication.getName();
         Path imageDir = Paths.get(IMAGE_DIR);
 
         // Create a ZIP in memory
@@ -153,7 +151,7 @@ public class DebugController {
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
                 List<Path> imageFiles = Files.list(imageDir)
-                        .filter(path -> path.getFileName().toString().startsWith(username + "_"))
+                        .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
                         .collect(Collectors.toList());
 
                 for (Path filePath : imageFiles) {
@@ -167,12 +165,12 @@ public class DebugController {
 
         byte[] zipBytes = baos.toByteArray();
         if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No files for user
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No image files
         }
 
         Resource resource = new ByteArrayResource(zipBytes);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=images_backup_" + username + ".zip")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_images_backup.zip")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }

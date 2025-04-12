@@ -36,6 +36,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/api/endpoint").permitAll() // Allow user creation
                         .requestMatchers("/api/upload-fit", "/api/download-json/**", "/api/upload-image", "/api/list-images/**", "/api/image-for-json/**").authenticated()
+                        .requestMatchers("/api/debug-db").permitAll()
+                        .requestMatchers("/api/backup-all-json", "/api/backup-all-images").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
