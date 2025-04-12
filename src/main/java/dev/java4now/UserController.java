@@ -286,7 +286,7 @@ public class UserController {
     @GetMapping("/image-for-json/{jsonFile}")
     public ResponseEntity<List<String>> getImageForJson(
             @PathVariable String jsonFile,
-            Authentication authentication) throws IOException {
+            Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
@@ -297,20 +297,27 @@ public class UserController {
         }
 
         Path imageDir = Paths.get(IMAGE_DIR);
-        String jsonBaseName = jsonFile.replace(".json", "");
-        List<String> imageFilenames = Files.list(imageDir)
-                .filter(path -> path.getFileName().toString().startsWith(jsonBaseName + "_"))
-                .sorted((p1, p2) -> Long.compare(
-                        Long.parseLong(p2.getFileName().toString().split("_")[3].replace(".jpg", "")),
-                        Long.parseLong(p1.getFileName().toString().split("_")[3].replace(".jpg", ""))))
-                .map(path -> path.getFileName().toString())
-                .collect(Collectors.toList());
+        List<String> imageFilenames = new ArrayList<>();
 
-        if (imageFilenames.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        // Check if directory exists before listing
+        if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
+            try {
+                imageFilenames = Files.list(imageDir)
+                        .filter(path -> path.getFileName().toString().startsWith(jsonFile.replace(".json", "") + "_"))
+                        .sorted((p1, p2) -> {
+                            String timestamp1 = p1.getFileName().toString().split("_")[3].replace(".jpg", "");
+                            String timestamp2 = p2.getFileName().toString().split("_")[3].replace(".jpg", "");
+                            return Long.compare(Long.parseLong(timestamp2), Long.parseLong(timestamp1));
+                        })
+                        .map(path -> path.getFileName().toString())
+                        .collect(Collectors.toList());
+            } catch (IOException e) {
+                System.err.println("Error listing images for " + jsonFile + ": " + e.getMessage());
+                // Continue with empty list instead of throwing 500
+            }
         }
 
-        // Generate pre-signed URLs
+        // Always return 200 OK with an empty list if no images
         List<String> signedUrls = imageFilenames.stream()
                 .map(filename -> {
                     String token = generateToken(username);
@@ -334,6 +341,9 @@ public class UserController {
         Resource resource = new UrlResource(imagePath.toUri());
 
         if (!resource.exists() || !resource.isReadable()) {
+            // No image directory yet, return empty list
+            List<String> imageUrls = new ArrayList<>();
+//            return ResponseEntity.ok(imageUrls);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
