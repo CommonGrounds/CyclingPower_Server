@@ -85,7 +85,7 @@ public class DebugController {
 
     @GetMapping("/api/download-db")
     public ResponseEntity<Resource> downloadDb() throws IOException {
-        File file = new File("./cycling_power.db");
+        File file = new File("./api/cycling_power.db");
         InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cycling_power.db")
