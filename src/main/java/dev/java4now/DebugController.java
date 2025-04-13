@@ -102,30 +102,38 @@ public class DebugController {
 
 
 
-    @GetMapping("/backup-all-json-public")
+    @GetMapping("/api/backup-all-json-public")
     public ResponseEntity<Resource> backupAllJsonFilesPublic() throws IOException {
         Path jsonDir = Paths.get(JSON_DIR);
+        System.out.println("Checking directory: " + jsonDir.toAbsolutePath());
+        if (!Files.exists(jsonDir)) {
+            System.out.println("Directory does not exist: " + jsonDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        if (!Files.isDirectory(jsonDir)) {
+            System.out.println("Path is not a directory: " + jsonDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
 
-        // Create a ZIP in memory
+        List<Path> jsonFiles = Files.list(jsonDir)
+                .filter(path -> path.getFileName().toString().endsWith(".json"))
+                .collect(Collectors.toList());
+        System.out.println("Found " + jsonFiles.size() + " JSON files: " + jsonFiles);
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            if (Files.exists(jsonDir) && Files.isDirectory(jsonDir)) {
-                List<Path> jsonFiles = Files.list(jsonDir)
-                        .filter(path -> path.getFileName().toString().endsWith(".json"))
-                        .collect(Collectors.toList());
-
-                for (Path filePath : jsonFiles) {
-                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
-                    zos.putNextEntry(entry);
-                    Files.copy(filePath, zos);
-                    zos.closeEntry();
-                }
+            for (Path filePath : jsonFiles) {
+                ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                zos.putNextEntry(entry);
+                Files.copy(filePath, zos);
+                zos.closeEntry();
             }
         }
 
         byte[] zipBytes = baos.toByteArray();
         if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No JSON files
+            System.out.println("No JSON files found, returning 404");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
         Resource resource = new ByteArrayResource(zipBytes);
@@ -133,15 +141,8 @@ public class DebugController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_json_backup_public.zip")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
-
-        // Optional token-based security (uncomment to enable)
-        /*
-        String expectedKey = "your-secret-key"; // Define a secret key
-        if (!expectedKey.equals(key)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-        */
     }
+
 
     @GetMapping("/backup-all-images-public")
     public ResponseEntity<Resource> backupAllImageFilesPublic() throws IOException {
