@@ -174,4 +174,89 @@ public class DebugController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
+
+
+// Existing endpoints unchanged (createUser, getUsers, checkUsername, upload-fit, download-json, list-json, upload-image, image-for-json, getImage, download-db, backup-json, backup-images, backup-all-json, backup-all-images)
+
+    @GetMapping("/backup-all-json-public")
+    public ResponseEntity<Resource> backupAllJsonFilesPublic() throws IOException {
+        Path jsonDir = Paths.get(JSON_DIR);
+
+        // Create a ZIP in memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            if (Files.exists(jsonDir) && Files.isDirectory(jsonDir)) {
+                List<Path> jsonFiles = Files.list(jsonDir)
+                        .filter(path -> path.getFileName().toString().endsWith(".json"))
+                        .collect(Collectors.toList());
+
+                for (Path filePath : jsonFiles) {
+                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+
+        byte[] zipBytes = baos.toByteArray();
+        if (zipBytes.length == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No JSON files
+        }
+
+        Resource resource = new ByteArrayResource(zipBytes);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_json_backup_public.zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+
+        // Optional token-based security (uncomment to enable)
+        /*
+        String expectedKey = "your-secret-key"; // Define a secret key
+        if (!expectedKey.equals(key)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        */
+    }
+
+    @GetMapping("/backup-all-images-public")
+    public ResponseEntity<Resource> backupAllImageFilesPublic() throws IOException {
+        Path imageDir = Paths.get(IMAGE_DIR);
+
+        // Create a ZIP in memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
+                List<Path> imageFiles = Files.list(imageDir)
+                        .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
+                        .collect(Collectors.toList());
+
+                for (Path filePath : imageFiles) {
+                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                    zos.putNextEntry(entry);
+                    Files.copy(filePath, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+
+        byte[] zipBytes = baos.toByteArray();
+        if (zipBytes.length == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No image files
+        }
+
+        Resource resource = new ByteArrayResource(zipBytes);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_images_backup_public.zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+
+        // Optional token-based security (uncomment to enable)
+        /*
+        String expectedKey = "your-secret-key"; // Define a secret key
+        if (!expectedKey.equals(key)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        */
+    }
 }

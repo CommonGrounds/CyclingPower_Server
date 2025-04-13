@@ -1,14 +1,17 @@
 package dev.java4now;
 
+import dev.java4now.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -39,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/api/endpoint").permitAll()
                         .requestMatchers("/api/debug-db").permitAll()
+                        .requestMatchers("/api/backup-all-json-public", "/api/backup-all-images-public").permitAll() // New public endpoints
                         .requestMatchers("/api/backup-all-json", "/api/backup-all-images").hasRole("ADMIN")
                         .requestMatchers("/api/upload-fit", "/api/download-json/**", "/api/upload-image", "/api/list-images/**", "/api/image-for-json/**").authenticated()
                         .anyRequest().permitAll()
