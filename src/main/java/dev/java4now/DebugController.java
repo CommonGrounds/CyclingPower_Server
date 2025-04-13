@@ -85,7 +85,7 @@ public class DebugController {
 
     @GetMapping("/api/download-db")
     public ResponseEntity<Resource> downloadDb() throws IOException {
-        File file = new File("./api/cycling_power.db");
+        File file = new File("./cycling_power.db");
         InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cycling_power.db")
@@ -101,82 +101,6 @@ public class DebugController {
     }
 
 
-    @GetMapping("/backup-all-json")
-    public ResponseEntity<Resource> backupAllJsonFiles(Authentication authentication) throws IOException {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        Path jsonDir = Paths.get(JSON_DIR);
-
-        // Create a ZIP in memory
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            if (Files.exists(jsonDir) && Files.isDirectory(jsonDir)) {
-                List<Path> jsonFiles = Files.list(jsonDir)
-                        .filter(path -> path.getFileName().toString().endsWith(".json"))
-                        .collect(Collectors.toList());
-
-                for (Path filePath : jsonFiles) {
-                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
-                    zos.putNextEntry(entry);
-                    Files.copy(filePath, zos);
-                    zos.closeEntry();
-                }
-            }
-        }
-
-        byte[] zipBytes = baos.toByteArray();
-        if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No JSON files
-        }
-
-        Resource resource = new ByteArrayResource(zipBytes);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_json_backup.zip")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
-    }
-
-    @GetMapping("/backup-all-images")
-    public ResponseEntity<Resource> backupAllImageFiles(Authentication authentication) throws IOException {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        Path imageDir = Paths.get(IMAGE_DIR);
-
-        // Create a ZIP in memory
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
-                List<Path> imageFiles = Files.list(imageDir)
-                        .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
-                        .collect(Collectors.toList());
-
-                for (Path filePath : imageFiles) {
-                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
-                    zos.putNextEntry(entry);
-                    Files.copy(filePath, zos);
-                    zos.closeEntry();
-                }
-            }
-        }
-
-        byte[] zipBytes = baos.toByteArray();
-        if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No image files
-        }
-
-        Resource resource = new ByteArrayResource(zipBytes);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_images_backup.zip")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
-    }
-
-
-// Existing endpoints unchanged (createUser, getUsers, checkUsername, upload-fit, download-json, list-json, upload-image, image-for-json, getImage, download-db, backup-json, backup-images, backup-all-json, backup-all-images)
 
     @GetMapping("/backup-all-json-public")
     public ResponseEntity<Resource> backupAllJsonFilesPublic() throws IOException {
