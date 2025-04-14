@@ -145,7 +145,7 @@ public class DebugController {
     }
 
 
-    @GetMapping("/backup-all-images-public")
+    @GetMapping("/api/backup-all-images-public")
     public ResponseEntity<Resource> backupAllImageFilesPublic() throws IOException {
         Path imageDir = Paths.get(IMAGE_DIR);
         System.out.println("Checking image directory: " + imageDir.toAbsolutePath());
