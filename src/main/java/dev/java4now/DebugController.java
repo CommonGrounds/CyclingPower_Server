@@ -123,7 +123,7 @@ public class DebugController {
                 System.err.println("GIT_TOKEN not set");
                 return;
             }
-            pb.command("git", "push", "https://x:" + gitToken + "@github.com/yourusername/cyclingpower.git", "main");
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
             p = pb.start();
             String pushOutput = readProcessOutput(p);
             int pushExit = p.waitFor();
