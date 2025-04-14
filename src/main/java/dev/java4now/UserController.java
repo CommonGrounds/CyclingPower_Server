@@ -25,8 +25,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -291,22 +293,65 @@ public class UserController {
         try {
             ProcessBuilder pb = new ProcessBuilder();
             pb.directory(new File("/app"));
-            // Add files
+            pb.redirectErrorStream(true); // Merge stdout and stderr
+
+            // Check if .git exists
+            if (!Files.exists(Paths.get("/app/.git"))) {
+                System.err.println("Git repository not found in /app");
+                return;
+            }
+
+            // Git add
             pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
             Process p = pb.start();
-            p.waitFor();
-            // Commit
+            String addOutput = readProcessOutput(p);
+            int addExit = p.waitFor();
+            System.out.println("Git add output: " + addOutput);
+            if (addExit != 0) {
+                System.err.println("Git add failed with exit code " + addExit);
+                return;
+            }
+
+            // Git commit
             pb.command("git", "commit", "-m", message);
             p = pb.start();
-            p.waitFor();
-            // Push
-            pb.command("git", "push", "origin", "main");
+            String commitOutput = readProcessOutput(p);
+            int commitExit = p.waitFor();
+            System.out.println("Git commit output: " + commitOutput);
+            if (commitExit != 0) {
+                System.err.println("Git commit failed with exit code " + commitExit);
+                return;
+            }
+
+            // Git push
+            String gitToken = System.getenv("GIT_TOKEN");
+            if (gitToken == null || gitToken.isEmpty()) {
+                System.err.println("GIT_TOKEN not set");
+                return;
+            }
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/yourusername/cyclingpower.git", "main");
             p = pb.start();
-            p.waitFor();
-            System.out.println("Committed to Git: " + message);
+            String pushOutput = readProcessOutput(p);
+            int pushExit = p.waitFor();
+            System.out.println("Git push output: " + pushOutput);
+            if (pushExit == 0) {
+                System.out.println("Successfully committed to Git: " + message);
+            } else {
+                System.err.println("Git push failed with exit code " + pushExit);
+            }
         } catch (IOException | InterruptedException e) {
-            System.err.println("Git commit failed: " + e.getMessage());
+            System.err.println("Git operation failed: " + e.getMessage());
         }
+    }
+
+    private String readProcessOutput(Process process) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return output.toString();
     }
 
 

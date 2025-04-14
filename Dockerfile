@@ -16,16 +16,17 @@ COPY images /app/images
 RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"
-# Install Git
 RUN apt-get update && apt-get install -y git
-# Configure Git
-RUN git config --global user.email "server@cyclingpower.app" && \
-    git config --global user.name "CyclingPower Server"
-# Clone repository
+RUN git config --global user.email "java4now@gmail.com" && \
+    git config --global user.name "CyclingPower_Server"
 ARG GIT_TOKEN
-RUN git clone https://x:${GIT_TOKEN}@github.com/CommonGrounds/CyclingPower_Server.git /app/repo && \
-    mv /app/repo/.git /app/.git && \
-    rm -rf /app/repo
+RUN if [ -n "$GIT_TOKEN" ]; then \
+        git clone https://x:${GIT_TOKEN}@github.com/CommonGrounds/CyclingPower_Server.git /app/repo && \
+        mv /app/repo/.git /app/.git && \
+        rm -rf /app/repo; \
+    else \
+        echo "GIT_TOKEN not provided, skipping clone"; \
+    fi
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
