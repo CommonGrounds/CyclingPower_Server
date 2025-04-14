@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.http.MediaType;
 
 import javax.sql.DataSource;
@@ -22,7 +20,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
-
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,15 +29,15 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-
 @RestController
 public class DebugController {
     @Autowired
     private DataSource dataSource;
-    private static final String JSON_DIR = "/app/json"; // Absolute path for Render
-    private static final String IMAGE_DIR = "/app/images"; // Absolute path for Render
+    private static final String JSON_DIR = "/app/json";
+    private static final String IMAGE_DIR = "/app/images";
     private static final String UPLOAD_DIR = "Uploads/";
     private static final String DB_PATH = "cycling_power.db";
+    private static final String BACKUP_TOKEN = System.getenv("BACKUP_TOKEN") != null ? System.getenv("BACKUP_TOKEN") : "your-secret-key";
 
     @GetMapping("/api/debug-db")
     public String debugDatabase() {
@@ -48,23 +45,17 @@ public class DebugController {
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
             String dbPath = dataSource.getConnection().getMetaData().getURL();
             StringBuilder result = new StringBuilder("Database path: " + dbPath + "\n");
-
-            // Check if 'users' table exists
             boolean tableExists = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='APP_USER'",
                     Integer.class
             ) > 0;
             result.append("Users table exists: ").append(tableExists).append("\n");
-
             if (tableExists) {
-                // Count users
                 Integer userCount = jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM APP_USER",
                         Integer.class
                 );
                 result.append("User count: ").append(userCount).append("\n");
-
-                // Optional: List usernames (adjust column name if different)
                 String users = jdbcTemplate.queryForList(
                         "SELECT NAME FROM APP_USER",
                         String.class
@@ -73,7 +64,6 @@ public class DebugController {
             } else {
                 result.append("No 'users' table found in the database.\n");
             }
-
             return result.toString();
         } catch (SQLException e) {
             return "Error connecting to database: " + e.getMessage();
@@ -81,7 +71,6 @@ public class DebugController {
             return "Error querying database: " + e.getMessage();
         }
     }
-
 
     @GetMapping("/api/download-db")
     public ResponseEntity<Resource> downloadDb() throws IOException {
@@ -93,25 +82,28 @@ public class DebugController {
                 .body(resource);
     }
 
-
     @PostMapping("/api/upload-db")
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
         file.transferTo(new File("./cycling_power.db"));
         return ResponseEntity.ok("Database uploaded");
     }
 
-
-
     @GetMapping("/api/backup-all-json-public")
-    public ResponseEntity<Resource> backupAllJsonFilesPublic() throws IOException {
+    public ResponseEntity<Resource> backupAllJsonFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
+        System.out.println("Received JSON backup request with token: " + (token != null ? "provided" : "null"));
+        if (token == null || !BACKUP_TOKEN.equals(token)) {
+            System.out.println("Invalid or missing token for JSON backup");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
         Path jsonDir = Paths.get(JSON_DIR);
-        System.out.println("Checking directory: " + jsonDir.toAbsolutePath());
+        System.out.println("Checking JSON directory: " + jsonDir.toAbsolutePath());
         if (!Files.exists(jsonDir)) {
-            System.out.println("Directory does not exist: " + jsonDir);
+            System.out.println("JSON directory does not exist: " + jsonDir);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
         if (!Files.isDirectory(jsonDir)) {
-            System.out.println("Path is not a directory: " + jsonDir);
+            System.out.println("JSON path is not a directory: " + jsonDir);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
@@ -123,6 +115,7 @@ public class DebugController {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             for (Path filePath : jsonFiles) {
+                System.out.println("Adding JSON file: " + filePath);
                 ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
                 zos.putNextEntry(entry);
                 Files.copy(filePath, zos);
@@ -144,9 +137,14 @@ public class DebugController {
                 .body(resource);
     }
 
-
     @GetMapping("/api/backup-all-images-public")
-    public ResponseEntity<Resource> backupAllImageFilesPublic() throws IOException {
+    public ResponseEntity<Resource> backupAllImageFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
+        System.out.println("Received image backup request with token: " + (token != null ? "provided" : "null"));
+        if (token == null || !BACKUP_TOKEN.equals(token)) {
+            System.out.println("Invalid or missing token for image backup");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
         Path imageDir = Paths.get(IMAGE_DIR);
         System.out.println("Checking image directory: " + imageDir.toAbsolutePath());
         if (!Files.exists(imageDir)) {
@@ -186,19 +184,16 @@ public class DebugController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_images_backup_public.zip")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
-
-        // Optional token-based security (uncomment to enable)
-        /*
-        String expectedKey = "your-secret-key"; // Define a secret key
-        if (!expectedKey.equals(key)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-        */
     }
 
-
     @GetMapping("/api/list-images-public")
-    public ResponseEntity<List<String>> listImagesPublic() throws IOException {
+    public ResponseEntity<List<String>> listImagesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
+        System.out.println("Received list images request with token: " + (token != null ? "provided" : "null"));
+        if (token == null || !BACKUP_TOKEN.equals(token)) {
+            System.out.println("Invalid or missing token for list images");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
         Path imageDir = Paths.get(IMAGE_DIR);
         if (!Files.exists(imageDir) || !Files.isDirectory(imageDir)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
