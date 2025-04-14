@@ -93,11 +93,13 @@ public class UserController {
     }
 
 
+
     @GetMapping("/ping")
     public ResponseEntity<String> ping() {
         System.out.println("Received ping request");
         return ResponseEntity.ok("OK");
     }
+
 
 
     @GetMapping("/users")
