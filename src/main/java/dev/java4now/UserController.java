@@ -92,6 +92,14 @@ public class UserController {
         }
     }
 
+
+    @GetMapping("/ping")
+    public ResponseEntity<String> ping() {
+        System.out.println("Received ping request");
+        return ResponseEntity.ok("OK");
+    }
+
+
     @GetMapping("/users")
     public List<User> getUsers(HttpServletRequest request) {
         // Get client IP address
