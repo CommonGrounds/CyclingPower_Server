@@ -195,4 +195,18 @@ public class DebugController {
         }
         */
     }
+
+
+    @GetMapping("/api/list-images-public")
+    public ResponseEntity<List<String>> listImagesPublic() throws IOException {
+        Path imageDir = Paths.get(IMAGE_DIR);
+        if (!Files.exists(imageDir) || !Files.isDirectory(imageDir)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(List.of());
+        }
+        List<String> imageFiles = Files.list(imageDir)
+                .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
+                .map(path -> path.getFileName().toString())
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(imageFiles);
+    }
 }

@@ -12,6 +12,8 @@ COPY --from=build /app/target/*.jar app.jar
 COPY cycling_power.db /app/cycling_power.db
 # Copy the entire json folder
 COPY json /app/json
+COPY images /app/images
+RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"
 EXPOSE 8080
