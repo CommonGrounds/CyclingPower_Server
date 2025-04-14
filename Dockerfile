@@ -23,7 +23,7 @@ RUN git config --global user.email "server@cyclingpower.app" && \
     git config --global user.name "CyclingPower Server"
 # Clone repository
 ARG GIT_TOKEN
-RUN git clone https://x:${GIT_TOKEN}@github.com/yourusername/cyclingpower.git /app/repo && \
+RUN git clone https://x:${GIT_TOKEN}@github.com/Wild_Camper/cyclingpower.git /app/repo && \
     mv /app/repo/.git /app/.git && \
     rm -rf /app/repo
 EXPOSE 8080
