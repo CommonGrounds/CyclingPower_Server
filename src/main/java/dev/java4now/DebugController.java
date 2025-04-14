@@ -37,8 +37,8 @@ import java.util.zip.ZipOutputStream;
 public class DebugController {
     @Autowired
     private DataSource dataSource;
-    private static final String JSON_DIR = "json/";
-    private static final String IMAGE_DIR = "images/";
+    private static final String JSON_DIR = "/app/json"; // Absolute path for Render
+    private static final String IMAGE_DIR = "/app/images"; // Absolute path for Render
     private static final String UPLOAD_DIR = "Uploads/";
     private static final String DB_PATH = "cycling_power.db";
 
@@ -128,6 +128,7 @@ public class DebugController {
                 Files.copy(filePath, zos);
                 zos.closeEntry();
             }
+            zos.finish();
         }
 
         byte[] zipBytes = baos.toByteArray();
@@ -147,27 +148,37 @@ public class DebugController {
     @GetMapping("/backup-all-images-public")
     public ResponseEntity<Resource> backupAllImageFilesPublic() throws IOException {
         Path imageDir = Paths.get(IMAGE_DIR);
+        System.out.println("Checking image directory: " + imageDir.toAbsolutePath());
+        if (!Files.exists(imageDir)) {
+            System.out.println("Image directory does not exist: " + imageDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        if (!Files.isDirectory(imageDir)) {
+            System.out.println("Image path is not a directory: " + imageDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
 
-        // Create a ZIP in memory
+        List<Path> imageFiles = Files.list(imageDir)
+                .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
+                .collect(Collectors.toList());
+        System.out.println("Found " + imageFiles.size() + " image files: " + imageFiles);
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
-                List<Path> imageFiles = Files.list(imageDir)
-                        .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
-                        .collect(Collectors.toList());
-
-                for (Path filePath : imageFiles) {
-                    ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
-                    zos.putNextEntry(entry);
-                    Files.copy(filePath, zos);
-                    zos.closeEntry();
-                }
+            for (Path filePath : imageFiles) {
+                System.out.println("Adding image: " + filePath);
+                ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                zos.putNextEntry(entry);
+                Files.copy(filePath, zos);
+                zos.closeEntry();
             }
+            zos.finish();
         }
 
         byte[] zipBytes = baos.toByteArray();
         if (zipBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // No image files
+            System.out.println("No image files found, returning 404");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
         Resource resource = new ByteArrayResource(zipBytes);
