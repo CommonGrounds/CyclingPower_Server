@@ -77,14 +77,17 @@ public class UserController {
 
 
     @PostMapping("/endpoint")
-    public String createUser(@RequestBody User user) {
-        System.out.println("WebFX send user: " + user.getName() + ", Email: " + user.getEmail());
-        // Hash the password before saving
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        userRepository.save(user); // Save to database
-        // Broadcast to WebSocket clients
-//        webSocketHandler.broadcast("New user added: " + user.getName());
-        return "User created successfully!";
+    public ResponseEntity<String> createUser(@RequestBody User user) {
+        System.out.println("Creating user: " + user.getName());
+        try {
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+            userRepository.save(user);
+            commitToGit("Add user " + user.getName());
+            return ResponseEntity.ok("User created successfully!");
+        } catch (Exception e) {
+            System.err.println("Error creating user: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
     }
 
     @GetMapping("/users")
@@ -172,6 +175,7 @@ public class UserController {
             // Save to SQLite - // IMPORTANT SQLLite - dodatak
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
             activityRepository.save(dbActivity);
+            commitToGit("Add FIT and JSON for " + username);
 
             Files.deleteIfExists(filePath);
             webSocketHandler.broadcast(jsonFileName);
@@ -274,6 +278,7 @@ public class UserController {
 
         // Save the image
         Files.write(filePath, imageFile.getBytes());
+        commitToGit("Add image " + imageFileName);
 
         // Optionally broadcast via WebSocket
         webSocketHandler.broadcast("Image uploaded: " + imageFileName);
@@ -281,6 +286,28 @@ public class UserController {
         return ResponseEntity.ok("Image uploaded successfully: " + imageFileName);
     }
 
+
+    private void commitToGit(String message) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.directory(new File("/app"));
+            // Add files
+            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
+            Process p = pb.start();
+            p.waitFor();
+            // Commit
+            pb.command("git", "commit", "-m", message);
+            p = pb.start();
+            p.waitFor();
+            // Push
+            pb.command("git", "push", "origin", "main");
+            p = pb.start();
+            p.waitFor();
+            System.out.println("Committed to Git: " + message);
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Git commit failed: " + e.getMessage());
+        }
+    }
 
 
     @GetMapping("/image-for-json/{jsonFile}")

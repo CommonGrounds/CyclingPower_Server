@@ -85,8 +85,30 @@ public class DebugController {
     @PostMapping("/api/upload-db")
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
         file.transferTo(new File("./cycling_power.db"));
+        commitToGit("Update database");
         return ResponseEntity.ok("Database uploaded");
     }
+
+
+    private void commitToGit(String message) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.directory(new File("/app"));
+            pb.command("git", "add", "cycling_power.db");
+            Process p = pb.start();
+            p.waitFor();
+            pb.command("git", "commit", "-m", message);
+            p = pb.start();
+            p.waitFor();
+            pb.command("git", "push", "origin", "main");
+            p = pb.start();
+            p.waitFor();
+            System.out.println("Committed to Git: " + message);
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Git commit failed: " + e.getMessage());
+        }
+    }
+
 
     @GetMapping("/api/backup-all-json-public")
     public ResponseEntity<Resource> backupAllJsonFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
