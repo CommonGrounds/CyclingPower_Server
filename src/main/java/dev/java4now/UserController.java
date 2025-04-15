@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*") // Allow all origins (adjust for production)
+//@CrossOrigin(origins = "*") // Allow all origins (adjust for production)
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
