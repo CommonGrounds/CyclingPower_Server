@@ -46,12 +46,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*")); // Allow all origins using a pattern
-//        config.setAllowedOrigins(List.of("http://localhost:63342","http://127.0.0.1:9876"));
+        config.setAllowedOrigins(List.of(
+                "https://cyclingpower-web.onrender.com", // WebFX frontend
+                "http://localhost:63342", // Local WebFX dev
+                "http://127.0.0.1:9876",  // Other local dev
+                "http://localhost:8880"    // Spring Boot dev
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
+        config.setAllowCredentials(true); // Needed for Basic Auth
+        config.setMaxAge(3600L); // Cache preflight for 1 hour
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
