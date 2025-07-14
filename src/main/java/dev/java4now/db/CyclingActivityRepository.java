@@ -9,5 +9,9 @@ import java.util.List;
 
 @Repository
 public interface CyclingActivityRepository extends JpaRepository<CyclingActivityEntity, Long> {
+
     List<CyclingActivityEntity> findByUserName(String username);
+
+    // New method for sorted results
+    List<CyclingActivityEntity> findByUserNameOrderByUploadDateDesc(String username);
 }

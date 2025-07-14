@@ -25,10 +25,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,13 +46,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-//@CrossOrigin(origins = "*") // Allow all origins (adjust for production)
+@CrossOrigin(origins = "*") // Allow all origins (adjust for production)
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
     private static final String JSON_DIR = "json/"; // Directory to save JSON files on server
     private static final String UPLOAD_DIR = "uploads/"; // Directory to save .fit files on server
     private static final String IMAGE_DIR = "images/"; // New directory for images
+    public static String BASE_URL = "http://localhost:8880"; // https://cyclingpower-server-1.onrender.com
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
 
@@ -79,28 +78,15 @@ public class UserController {
 
 
     @PostMapping("/endpoint")
-    public ResponseEntity<String> createUser(@RequestBody User user) {
-        System.out.println("Creating user: " + user.getName());
-        try {
-            user.setPassword(passwordEncoder.encode(user.getPassword()));
-            userRepository.save(user);
-            commitToGit("Add user " + user.getName());
-            return ResponseEntity.ok("User created successfully!");
-        } catch (Exception e) {
-            System.err.println("Error creating user: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
-        }
+    public String createUser(@RequestBody User user) {
+        System.out.println("WebFX send user: " + user.getName() + ", Email: " + user.getEmail());
+        // Hash the password before saving
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        userRepository.save(user); // Save to database
+        // Broadcast to WebSocket clients
+//        webSocketHandler.broadcast("New user added: " + user.getName());
+        return "User created successfully!";
     }
-
-
-
-    @GetMapping("/ping")
-    public ResponseEntity<String> ping() {
-        System.out.println("Received ping request");
-        return ResponseEntity.ok("OK");
-    }
-
-
 
     @GetMapping("/users")
     public List<User> getUsers(HttpServletRequest request) {
@@ -120,10 +106,15 @@ public class UserController {
     // New endpoint to check if username exists
     @GetMapping("/check-username")
     public ResponseEntity<Boolean> checkUsername(@RequestParam String username) {
-//        System.out.println("userRepository.findByName(username): " + userRepository.findByName(username));
-        Optional<User> user = userRepository.findByName(username);
-//        System.out.println("user.isPresent(): " + user.isPresent());
-        return ResponseEntity.ok(user.isPresent()); // Returns true if username exists, false otherwise
+        System.out.println("Checking username: " + username);
+        try {
+            Optional<User> user = userRepository.findByName(username);
+            System.out.println("User found: " + user.isPresent());
+            return ResponseEntity.ok(user.isPresent());
+        } catch (Exception e) {
+            System.err.println("Error checking username: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
 
@@ -187,7 +178,6 @@ public class UserController {
             // Save to SQLite - // IMPORTANT SQLLite - dodatak
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
             activityRepository.save(dbActivity);
-            commitToGit("Add FIT and JSON for " + username);
 
             Files.deleteIfExists(filePath);
             webSocketHandler.broadcast(jsonFileName);
@@ -233,7 +223,6 @@ public class UserController {
     }
 
 
-    // New endpoint to list all JSON files in JSON_DIR
     @GetMapping("/list-json")
     public ResponseEntity<List<String>> listJsonFiles(Authentication authentication) {
         System.out.println("/list-json - Authentication: " + (authentication != null ? authentication.getName() : "null"));
@@ -242,13 +231,61 @@ public class UserController {
         }
 
         String username = authentication.getName();
-        List<CyclingActivityEntity> activities = activityRepository.findByUserName(username);
-        List<String> jsonFiles = activities.stream()
+        // Use the new sorted repository method
+        List<String> jsonFiles = activityRepository.findByUserNameOrderByUploadDateDesc(username)
+                .stream()
                 .map(CyclingActivityEntity::getFilename)
                 .collect(Collectors.toList());
+
         return ResponseEntity.ok(jsonFiles);
     }
 
+    /*
+    // Sorting - old way
+    @GetMapping("/list-json")
+public ResponseEntity<List<String>> listJsonFiles(Authentication authentication) {
+    System.out.println("/list-json - Authentication: " + (authentication != null ? authentication.getName() : "null"));
+    if (authentication == null || !authentication.isAuthenticated()) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+    }
+
+    String username = authentication.getName();
+    List<CyclingActivityEntity> activities = activityRepository.findByUserName(username);
+
+    // Convert to List of filenames
+    List<String> jsonFiles = new ArrayList<>();
+    for (CyclingActivityEntity activity : activities) {
+        jsonFiles.add(activity.getFilename());
+    }
+
+    // Sort using a custom comparator
+    Collections.sort(jsonFiles, new Comparator<String>() {
+        @Override
+        public int compare(String filename1, String filename2) {
+            long timestamp1 = extractTimestamp(filename1);
+            long timestamp2 = extractTimestamp(filename2);
+            // Sort in descending order (newest first)
+            return Long.compare(timestamp2, timestamp1);
+        }
+    });
+
+    return ResponseEntity.ok(jsonFiles);
+}
+
+// Helper method to extract timestamp from filename
+private long extractTimestamp(String filename) {
+    try {
+        // Remove the .json extension
+        String withoutExtension = filename.substring(0, filename.lastIndexOf('.'));
+        // Get the last part after the last underscore
+        String[] parts = withoutExtension.split("_");
+        String timestampStr = parts[parts.length - 1];
+        return Long.parseLong(timestampStr);
+    } catch (Exception e) {
+        return 0L; // Return 0 if parsing fails
+    }
+}
+     */
 
     @PostMapping("/upload-image")
     public ResponseEntity<String> uploadImage(
@@ -290,7 +327,6 @@ public class UserController {
 
         // Save the image
         Files.write(filePath, imageFile.getBytes());
-        commitToGit("Add image " + imageFileName);
 
         // Optionally broadcast via WebSocket
         webSocketHandler.broadcast("Image uploaded: " + imageFileName);
@@ -299,70 +335,6 @@ public class UserController {
     }
 
 
-    private void commitToGit(String message) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder();
-            pb.directory(new File("/app"));
-            pb.redirectErrorStream(true); // Merge stdout and stderr
-
-            // Check if .git exists
-            if (!Files.exists(Paths.get("/app/.git"))) {
-                System.err.println("Git repository not found in /app");
-                return;
-            }
-
-            // Git add
-            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
-            Process p = pb.start();
-            String addOutput = readProcessOutput(p);
-            int addExit = p.waitFor();
-            System.out.println("Git add output: " + addOutput);
-            if (addExit != 0) {
-                System.err.println("Git add failed with exit code " + addExit);
-                return;
-            }
-
-            // Git commit
-            pb.command("git", "commit", "-m", message);
-            p = pb.start();
-            String commitOutput = readProcessOutput(p);
-            int commitExit = p.waitFor();
-            System.out.println("Git commit output: " + commitOutput);
-            if (commitExit != 0) {
-                System.err.println("Git commit failed with exit code " + commitExit);
-                return;
-            }
-
-            // Git push
-            String gitToken = System.getenv("GIT_TOKEN");
-            if (gitToken == null || gitToken.isEmpty()) {
-                System.err.println("GIT_TOKEN not set");
-                return;
-            }
-            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-            p = pb.start();
-            String pushOutput = readProcessOutput(p);
-            int pushExit = p.waitFor();
-            System.out.println("Git push output: " + pushOutput);
-            if (pushExit == 0) {
-                System.out.println("Successfully committed to Git: " + message);
-            } else {
-                System.err.println("Git push failed with exit code " + pushExit);
-            }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("Git operation failed: " + e.getMessage());
-        }
-    }
-
-    private String readProcessOutput(Process process) throws IOException {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        StringBuilder output = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            output.append(line).append("\n");
-        }
-        return output.toString();
-    }
 
 
     @GetMapping("/image-for-json/{jsonFile}")
@@ -403,7 +375,7 @@ public class UserController {
         List<String> signedUrls = imageFilenames.stream()
                 .map(filename -> {
                     String token = generateToken(username);
-                    return "https://cyclingpower-server-1.onrender.com/api/images/" + filename + "?token=" + token;
+                    return BASE_URL + "/api/images/" + filename + "?token=" + token;
                 })
                 .collect(Collectors.toList());
 
@@ -411,6 +383,7 @@ public class UserController {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(signedUrls);
     }
+
 
 
 
@@ -423,9 +396,6 @@ public class UserController {
         Resource resource = new UrlResource(imagePath.toUri());
 
         if (!resource.exists() || !resource.isReadable()) {
-            // No image directory yet, return empty list
-            List<String> imageUrls = new ArrayList<>();
-//            return ResponseEntity.ok(imageUrls);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 

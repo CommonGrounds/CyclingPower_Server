@@ -3,10 +3,12 @@ package dev.java4now;
 // for jar
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @SpringBootApplication
 public class App {
     public static void main(String[] args) {
+//        System.out.println(new BCryptPasswordEncoder().encode("test"));
         SpringApplication.run(App.class, args);
     }
 }
