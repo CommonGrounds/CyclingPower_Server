@@ -109,20 +109,18 @@ public class DebugController {
                 Process p = pb.start();
                 System.out.println("Directory state: " + readProcessOutput(p));
 
-                // Verify specific files exist and normalize paths
-                List<String> normalizedFilesToAdd = new ArrayList<>();
+                // Verify specific files exist
                 for (String filePath : filesToAdd) {
                     Path path = Paths.get(filePath).normalize();
                     if (Files.exists(path)) {
-                        // Convert to path relative to /app
-                        String relativePath = path.startsWith("/app/") ?
-                                path.toString().substring(5) : path.toString();
-                        normalizedFilesToAdd.add(relativePath);
-                        System.out.println("File exists: " + relativePath);
+                        System.out.println("File exists: " + path);
                     } else {
                         System.err.println("File does not exist: " + path);
                     }
                 }
+
+                // Wait to ensure filesystem consistency
+                Thread.sleep(1000);
 
                 // Stash any existing changes
                 pb.command("git", "stash", "push", "--include-untracked");
@@ -153,11 +151,13 @@ public class DebugController {
                     return;
                 }
 
-                // Add specific files and directories
-                List<String> addCommand = new ArrayList<>(Arrays.asList("git", "add", "--force", "cycling_power.db", "json/", "images/"));
-                addCommand.addAll(normalizedFilesToAdd);
-                System.out.println("Executing git add command: " + String.join(" ", addCommand));
-                pb.command(addCommand);
+                // Reset Git index
+                pb.command("git", "reset");
+                p = pb.start();
+                System.out.println("Git reset output: " + readProcessOutput(p));
+
+                // Add all changes in json/, images/, and cycling_power.db
+                pb.command("git", "add", "--force", ".", "cycling_power.db", "json/", "images/");
                 p = pb.start();
                 String addOutput = readProcessOutput(p);
                 int addExit = p.waitFor();
