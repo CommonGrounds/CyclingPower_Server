@@ -24,6 +24,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -90,134 +93,141 @@ public class DebugController {
 
 
     private static final Object GIT_LOCK = new Object();
+    private static final ReentrantLock gitLock = new ReentrantLock();
 
     private void commitToGit(String message, String... filesToAdd) {
-        synchronized (GIT_LOCK) {
-            try {
-                ProcessBuilder pb = new ProcessBuilder();
-                pb.directory(new File("/app"));
-                pb.redirectErrorStream(true);
+        String requestId = Thread.currentThread().getName() + "-" + UUID.randomUUID().toString();
+        System.out.println("[" + requestId + "] Attempting to acquire Git lock");
+        try {
+            if (!gitLock.tryLock(10, TimeUnit.SECONDS)) {
+                System.err.println("[" + requestId + "] Failed to acquire Git lock within 10 seconds");
+                return;
+            }
+            System.out.println("[" + requestId + "] Git lock acquired");
 
-                // Check if .git exists
-                if (!Files.exists(Paths.get("/app/.git"))) {
-                    System.err.println("Git repository not found in /app");
-                    return;
-                }
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.directory(new File("/app"));
+            pb.redirectErrorStream(true);
 
-                // Log current directory state
-                pb.command("ls", "-la", "json/", "images/", "cycling_power.db");
-                Process p = pb.start();
-                System.out.println("Directory state: " + readProcessOutput(p));
+            // Check if .git exists
+            if (!Files.exists(Paths.get("/app/.git"))) {
+                System.err.println("[" + requestId + "] Git repository not found in /app");
+                return;
+            }
 
-                // Verify specific files exist
-                for (String filePath : filesToAdd) {
-                    Path path = Paths.get(filePath).normalize();
-                    if (Files.exists(path)) {
-                        System.out.println("File exists: " + path);
-                    } else {
-                        System.err.println("File does not exist: " + path);
-                    }
-                }
+            // Log current directory state
+            pb.command("ls", "-la", "json/", "images/", "cycling_power.db");
+            Process p = pb.start();
+            System.out.println("[" + requestId + "] Directory state: " + readProcessOutput(p));
 
-                // Wait to ensure filesystem consistency
-                Thread.sleep(1000);
+            // Verify files exist
+            for (String filePath : filesToAdd) {
+                Path path = Paths.get(filePath).normalize();
+                System.out.println("[" + requestId + "] File " + path + " exists: " + Files.exists(path));
+            }
 
-                // Stash any existing changes
-                pb.command("git", "stash", "push", "--include-untracked");
+            // Wait for filesystem consistency
+            Thread.sleep(1000);
+
+            // Stash changes
+            pb.command("git", "stash", "push", "--include-untracked");
+            p = pb.start();
+            String stashOutput = readProcessOutput(p);
+            int stashExit = p.waitFor();
+            System.out.println("[" + requestId + "] Git stash output: " + stashOutput);
+            if (stashExit != 0) {
+                System.err.println("[" + requestId + "] Git stash failed with exit code " + stashExit);
+            }
+
+            // Git pull --rebase
+            String gitToken = System.getenv("GIT_TOKEN");
+            if (gitToken == null || gitToken.isEmpty()) {
+                System.err.println("[" + requestId + "] GIT_TOKEN not set");
+                return;
+            }
+            pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pullOutput = readProcessOutput(p);
+            int pullExit = p.waitFor();
+            System.out.println("[" + requestId + "] Git pull --rebase output: " + pullOutput);
+            if (pullExit != 0) {
+                System.err.println("[" + requestId + "] Git pull --rebase failed with exit code " + pullExit);
+                pb.command("git", "stash", "pop");
                 p = pb.start();
-                String stashOutput = readProcessOutput(p);
-                int stashExit = p.waitFor();
-                System.out.println("Git stash output: " + stashOutput);
-                if (stashExit != 0) {
-                    System.err.println("Git stash failed with exit code " + stashExit);
-                }
+                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                return;
+            }
 
-                // Git pull --rebase
-                String gitToken = System.getenv("GIT_TOKEN");
-                if (gitToken == null || gitToken.isEmpty()) {
-                    System.err.println("GIT_TOKEN not set");
-                    return;
-                }
-                pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-                p = pb.start();
-                String pullOutput = readProcessOutput(p);
-                int pullExit = p.waitFor();
-                System.out.println("Git pull --rebase output: " + pullOutput);
-                if (pullExit != 0) {
-                    System.err.println("Git pull --rebase failed with exit code " + pullExit);
-                    pb.command("git", "stash", "pop");
-                    p = pb.start();
-                    System.out.println("Git stash pop output: " + readProcessOutput(p));
-                    return;
-                }
+            // Reset Git index
+            pb.command("git", "reset");
+            p = pb.start();
+            System.out.println("[" + requestId + "] Git reset output: " + readProcessOutput(p));
 
-                // Reset Git index
-                pb.command("git", "reset");
+            // Add all changes
+            pb.command("git", "add", "--force", ".", "cycling_power.db", "json/", "images/");
+            p = pb.start();
+            String addOutput = readProcessOutput(p);
+            int addExit = p.waitFor();
+            System.out.println("[" + requestId + "] Git add output: " + addOutput);
+            if (addExit != 0) {
+                System.err.println("[" + requestId + "] Git add failed with exit code " + addExit);
+                pb.command("git", "stash", "pop");
                 p = pb.start();
-                System.out.println("Git reset output: " + readProcessOutput(p));
+                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                return;
+            }
 
-                // Add all changes in json/, images/, and cycling_power.db
-                pb.command("git", "add", "--force", ".", "cycling_power.db", "json/", "images/");
+            // Verify staged changes
+            pb.command("git", "status", "--porcelain");
+            p = pb.start();
+            String statusOutput = readProcessOutput(p);
+            System.out.println("[" + requestId + "] Git status output: " + statusOutput);
+            if (statusOutput.trim().isEmpty()) {
+                System.err.println("[" + requestId + "] No changes staged for commit");
+                pb.command("git", "ls-files", "--others", "--exclude-standard", "json/", "images/", "cycling_power.db");
                 p = pb.start();
-                String addOutput = readProcessOutput(p);
-                int addExit = p.waitFor();
-                System.out.println("Git add output: " + addOutput);
-                if (addExit != 0) {
-                    System.err.println("Git add failed with exit code " + addExit);
-                    pb.command("git", "stash", "pop");
-                    p = pb.start();
-                    System.out.println("Git stash pop output: " + readProcessOutput(p));
-                    return;
-                }
+                System.out.println("[" + requestId + "] Untracked files: " + readProcessOutput(p));
+                pb.command("git", "stash", "pop");
+                p = pb.start();
+                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                return;
+            }
 
-                // Verify staged changes
-                pb.command("git", "status", "--porcelain");
+            // Git commit
+            pb.command("git", "commit", "-m", message);
+            p = pb.start();
+            String commitOutput = readProcessOutput(p);
+            int commitExit = p.waitFor();
+            System.out.println("[" + requestId + "] Git commit output: " + commitOutput);
+            if (commitExit != 0) {
+                System.err.println("[" + requestId + "] Git commit failed with exit code " + commitExit);
+                pb.command("git", "stash", "pop");
                 p = pb.start();
-                String statusOutput = readProcessOutput(p);
-                int statusExit = p.waitFor();
-                System.out.println("Git status output: " + statusOutput);
-                if (statusOutput.trim().isEmpty()) {
-                    System.err.println("No changes staged for commit, checking untracked files");
-                    pb.command("git", "ls-files", "--others", "--exclude-standard", "json/", "images/", "cycling_power.db");
-                    p = pb.start();
-                    String untrackedOutput = readProcessOutput(p);
-                    System.out.println("Untracked files: " + untrackedOutput);
-                    pb.command("git", "stash", "pop");
-                    p = pb.start();
-                    System.out.println("Git stash pop output: " + readProcessOutput(p));
-                    return;
-                }
+                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                return;
+            }
 
-                // Git commit
-                pb.command("git", "commit", "-m", message);
+            // Git push
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pushOutput = readProcessOutput(p);
+            int pushExit = p.waitFor();
+            System.out.println("[" + requestId + "] Git push output: " + pushOutput);
+            if (pushExit == 0) {
+                System.out.println("[" + requestId + "] Successfully committed to Git: " + message);
+            } else {
+                System.err.println("[" + requestId + "] Git push failed with exit code " + pushExit);
+                pb.command("git", "stash", "pop");
                 p = pb.start();
-                String commitOutput = readProcessOutput(p);
-                int commitExit = p.waitFor();
-                System.out.println("Git commit output: " + commitOutput);
-                if (commitExit != 0) {
-                    System.err.println("Git commit failed with exit code " + commitExit);
-                    pb.command("git", "stash", "pop");
-                    p = pb.start();
-                    System.out.println("Git stash pop output: " + readProcessOutput(p));
-                    return;
-                }
-
-                // Git push
-                pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-                p = pb.start();
-                String pushOutput = readProcessOutput(p);
-                int pushExit = p.waitFor();
-                System.out.println("Git push output: " + pushOutput);
-                if (pushExit == 0) {
-                    System.out.println("Successfully committed to Git: " + message);
-                } else {
-                    System.err.println("Git push failed with exit code " + pushExit);
-                    pb.command("git", "stash", "pop");
-                    p = pb.start();
-                    System.out.println("Git stash pop output: " + readProcessOutput(p));
-                }
-            } catch (IOException | InterruptedException e) {
-                System.err.println("Git operation failed: " + e.getMessage());
+                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+            }
+        } catch (Exception e) {
+            System.err.println("[" + requestId + "] Git operation failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (gitLock.isHeldByCurrentThread()) {
+                System.out.println("[" + requestId + "] Releasing Git lock");
+                gitLock.unlock();
             }
         }
     }

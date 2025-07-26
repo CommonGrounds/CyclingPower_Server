@@ -1,5 +1,5 @@
 # Build stage
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY . .
 RUN mvn clean package -DskipTests
@@ -7,19 +7,19 @@ RUN mvn clean package -DskipTests
 # Runtime stage
 FROM openjdk:17-jdk-slim
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 COPY cycling_power.db /app/cycling_power.db
 COPY json /app/json
 COPY images /app/images
 COPY .gitignore /app/.gitignore
-RUN mkdir -p /app/uploads && chmod -R 755 /app
+RUN mkdir -p /app/uploads && chmod -R 775 /app
 RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
-RUN ls -l /app/cycling_power.db || { echo "DB file not found"; exit 1; }
-RUN ls -l /app/json || { echo "json folder not found"; exit 1; }
-RUN ls -l /app/images || { echo "images folder not found"; exit 1; }
-RUN ls -l /app/.gitignore || { echo ".gitignore not found"; exit 1; }
-RUN ls -ld /app/uploads || { echo "uploads folder not found"; exit 1; }
-RUN apt-get update && apt-get install -y git
+RUN ls -la /app/cycling_power.db || { echo "DB file not found"; exit 1; }
+RUN ls -la /app/json || { echo "json folder not found"; exit 1; }
+RUN ls -la /app/images || { echo "images folder not found"; exit 1; }
+RUN ls -la /app/uploads || { echo "uploads folder not found"; exit 1; }
+RUN ls -la /app/.gitignore || { readProcessOutput(p); }
+RUN apt-get update && apt-get install -y git sqlite3
 RUN git config --global user.email "java4now@gmail.com" && \
     git config --global user.name "CyclingPower_Server"
 ARG GIT_TOKEN
@@ -36,7 +36,7 @@ RUN if [ -n "$GIT_TOKEN" ]; then \
     fi
 RUN git status || { echo "Git status failed"; exit 1; }
 RUN cat /app/.gitignore || { echo ".gitignore content not readable"; exit 1; }
-RUN git ls-files --others --exclude-standard || { echo "Listing untracked files failed"; exit 1; }
+RUN sqlite3 /app/cycling_power.db "SELECT name FROM sqlite_master WHERE type='table';" || { echo "SQLite check failed"; exit 1; }
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
