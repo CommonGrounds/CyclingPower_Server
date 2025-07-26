@@ -46,9 +46,9 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
-    private static final String JSON_DIR = "json/"; // Directory to save JSON files on server
-    private static final String UPLOAD_DIR = "uploads/"; // Directory to save .fit files on server
-    private static final String IMAGE_DIR = "images/"; // New directory for images
+    private static final String JSON_DIR = "/app/json/";
+    private static final String UPLOAD_DIR = "/app/Uploads/";
+    private static final String IMAGE_DIR = "/app/images/";
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
 
@@ -154,9 +154,9 @@ public class UserController {
             return "User must be logged in to upload files.";
         }
 
-        String username = authentication.getName(); // Get the logged-in user's name
+        String username = authentication.getName();
         User user = userRepository.findByName(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));  // IMPORTANT SQLLite - dodatak
+                .orElseThrow(() -> new RuntimeException("User not found"));
         try {
             // Ensure upload directory exists
             Path uploadPath = Paths.get(UPLOAD_DIR);
@@ -164,30 +164,40 @@ public class UserController {
                 Files.createDirectories(uploadPath);
             }
 
-// Save the .fit file temporarily
+            // Save the .fit file temporarily
             String originalFileName = file.getOriginalFilename();
             Path filePath = uploadPath.resolve(originalFileName);
             Files.write(filePath, file.getBytes());
             File fitFile = filePath.toFile();
             CyclingActivity activity = fitFileDecoderService.decodeFitFile(fitFile);
+
+            // Generate both JSON filenames
             String jsonFileName = username + "_" + originalFileName.replace(".fit", "") + "_" + System.currentTimeMillis() + ".json";
-            Path jsonPath = Paths.get(JSON_DIR).resolve(jsonFileName);
+            String masterJsonFileName = "master_cycling_activity_" + System.currentTimeMillis() + "_" + (System.currentTimeMillis() + 20572) + ".json";
+            Path jsonPath = Paths.get(JSON_DIR, jsonFileName);
+            Path masterJsonPath = Paths.get(JSON_DIR, masterJsonFileName);
             Files.createDirectories(jsonPath.getParent());
 
-            // Serialize to JSON using ObjectMapper
-//            String jsonContent = objectMapper.writeValueAsString(activity);
-//            Files.writeString(jsonPath, jsonContent);
-
-            // Write JSON file with explicit flush - umesto prethodnog
+            // Write primary JSON file
             try (FileOutputStream fos = new FileOutputStream(jsonPath.toFile())) {
                 objectMapper.writeValue(fos, activity);
-                fos.flush(); // Ensure data is written to disk
+                fos.flush();
             }
+            System.out.println("JSON file saved to: " + jsonPath);
 
-            // Save to SQLite - // IMPORTANT SQLLite - dodatak
+            // Write master JSON file (assuming same content for simplicity; adjust if different)
+            try (FileOutputStream fos = new FileOutputStream(masterJsonPath.toFile())) {
+                objectMapper.writeValue(fos, activity);
+                fos.flush();
+            }
+            System.out.println("Master JSON file saved to: " + masterJsonPath);
+
+            // Save to SQLite
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
             activityRepository.save(dbActivity);
-            commitToGit("Add FIT and JSON for " + username, jsonPath.toString());
+
+            // Commit both JSON files
+            commitToGit("Add FIT and JSON for " + username, jsonPath.toString(), masterJsonPath.toString());
 
             Files.deleteIfExists(filePath);
             webSocketHandler.broadcast(jsonFileName);
@@ -363,16 +373,22 @@ private long extractTimestamp(String filename) {
                 }
 
                 // Log current directory state
-                pb.command("ls", "-la", "json", "images", "cycling_power.db");
+                pb.command("ls", "-la", "json/", "images/", "cycling_power.db");
                 Process p = pb.start();
                 System.out.println("Directory state: " + readProcessOutput(p));
 
-                // Verify specific files exist
-                for (String file : filesToAdd) {
-                    if (Files.exists(Paths.get(file))) {
-                        System.out.println("File exists: " + file);
+                // Verify specific files exist and normalize paths
+                List<String> normalizedFilesToAdd = new ArrayList<>();
+                for (String filePath : filesToAdd) {
+                    Path path = Paths.get(filePath).normalize();
+                    if (Files.exists(path)) {
+                        // Convert to path relative to /app
+                        String relativePath = path.startsWith("/app/") ?
+                                path.toString().substring(5) : path.toString();
+                        normalizedFilesToAdd.add(relativePath);
+                        System.out.println("File exists: " + relativePath);
                     } else {
-                        System.err.println("File does not exist: " + file);
+                        System.err.println("File does not exist: " + path);
                     }
                 }
 
@@ -407,9 +423,8 @@ private long extractTimestamp(String filename) {
 
                 // Add specific files and directories
                 List<String> addCommand = new ArrayList<>(Arrays.asList("git", "add", "--force", "cycling_power.db", "json/", "images/"));
-                for (String file : filesToAdd) {
-                    addCommand.add(file);
-                }
+                addCommand.addAll(normalizedFilesToAdd);
+                System.out.println("Executing git add command: " + String.join(" ", addCommand));
                 pb.command(addCommand);
                 p = pb.start();
                 String addOutput = readProcessOutput(p);
@@ -463,7 +478,6 @@ private long extractTimestamp(String filename) {
                 System.out.println("Git push output: " + pushOutput);
                 if (pushExit == 0) {
                     System.out.println("Successfully committed to Git: " + message);
-                    // Only pop stash if push succeeds and no further operations are needed
                 } else {
                     System.err.println("Git push failed with exit code " + pushExit);
                     pb.command("git", "stash", "pop");

@@ -105,16 +105,22 @@ public class DebugController {
                 }
 
                 // Log current directory state
-                pb.command("ls", "-la", "json", "images", "cycling_power.db");
+                pb.command("ls", "-la", "json/", "images/", "cycling_power.db");
                 Process p = pb.start();
                 System.out.println("Directory state: " + readProcessOutput(p));
 
-                // Verify specific files exist
-                for (String file : filesToAdd) {
-                    if (Files.exists(Paths.get(file))) {
-                        System.out.println("File exists: " + file);
+                // Verify specific files exist and normalize paths
+                List<String> normalizedFilesToAdd = new ArrayList<>();
+                for (String filePath : filesToAdd) {
+                    Path path = Paths.get(filePath).normalize();
+                    if (Files.exists(path)) {
+                        // Convert to path relative to /app
+                        String relativePath = path.startsWith("/app/") ?
+                                path.toString().substring(5) : path.toString();
+                        normalizedFilesToAdd.add(relativePath);
+                        System.out.println("File exists: " + relativePath);
                     } else {
-                        System.err.println("File does not exist: " + file);
+                        System.err.println("File does not exist: " + path);
                     }
                 }
 
@@ -149,9 +155,8 @@ public class DebugController {
 
                 // Add specific files and directories
                 List<String> addCommand = new ArrayList<>(Arrays.asList("git", "add", "--force", "cycling_power.db", "json/", "images/"));
-                for (String file : filesToAdd) {
-                    addCommand.add(file);
-                }
+                addCommand.addAll(normalizedFilesToAdd);
+                System.out.println("Executing git add command: " + String.join(" ", addCommand));
                 pb.command(addCommand);
                 p = pb.start();
                 String addOutput = readProcessOutput(p);
@@ -205,7 +210,6 @@ public class DebugController {
                 System.out.println("Git push output: " + pushOutput);
                 if (pushExit == 0) {
                     System.out.println("Successfully committed to Git: " + message);
-                    // Only pop stash if push succeeds and no further operations are needed
                 } else {
                     System.err.println("Git push failed with exit code " + pushExit);
                     pb.command("git", "stash", "pop");
@@ -217,6 +221,7 @@ public class DebugController {
             }
         }
     }
+
 
     private String readProcessOutput(Process process) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
