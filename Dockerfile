@@ -13,6 +13,9 @@ COPY cycling_power.db /app/cycling_power.db
 # Copy the entire json folder
 COPY json /app/json
 COPY images /app/images
+# Prevent permission changes
+RUN chmod -R 644 /app/json /app/images
+
 RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"

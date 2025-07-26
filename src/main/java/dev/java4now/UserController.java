@@ -347,71 +347,102 @@ private long extractTimestamp(String filename) {
     }
 
 
+    private static final Object GIT_LOCK = new Object();
+
     private void commitToGit(String message) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder();
-            pb.directory(new File("/app"));
-            pb.redirectErrorStream(true);
+        synchronized (GIT_LOCK) {
+            try {
+                ProcessBuilder pb = new ProcessBuilder();
+                pb.directory(new File("/app"));
+                pb.redirectErrorStream(true);
 
-            // Check if .git exists
-            if (!Files.exists(Paths.get("/app/.git"))) {
-                System.err.println("Git repository not found in /app");
-                return;
-            }
+                // Check if .git exists
+                if (!Files.exists(Paths.get("/app/.git"))) {
+                    System.err.println("Git repository not found in /app");
+                    return;
+                }
 
-            // Git add
-            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
-            Process p = pb.start();
-            String addOutput = readProcessOutput(p);
-            int addExit = p.waitFor();
-            System.out.println("Git add output: " + addOutput);
-            if (addExit != 0) {
-                System.err.println("Git add failed with exit code " + addExit);
-                return;
-            }
+                // Stash any existing changes to ensure a clean working directory
+                pb.command("git", "stash", "push", "--include-untracked");
+                Process p = pb.start();
+                String stashOutput = readProcessOutput(p);
+                int stashExit = p.waitFor();
+                System.out.println("Git stash output: " + stashOutput);
+                if (stashExit != 0) {
+                    System.err.println("Git stash failed with exit code " + stashExit);
+                }
 
-            // Git commit
-            pb.command("git", "commit", "-m", message);
-            p = pb.start();
-            String commitOutput = readProcessOutput(p);
-            int commitExit = p.waitFor();
-            System.out.println("Git commit output: " + commitOutput);
-            if (commitExit != 0) {
-                System.err.println("Git commit failed with exit code " + commitExit);
-                return;
-            }
+                // Git pull --rebase
+                String gitToken = System.getenv("GIT_TOKEN");
+                if (gitToken == null || gitToken.isEmpty()) {
+                    System.err.println("GIT_TOKEN not set");
+                    return;
+                }
+                pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+                p = pb.start();
+                String pullOutput = readProcessOutput(p);
+                int pullExit = p.waitFor();
+                System.out.println("Git pull --rebase output: " + pullOutput);
+                if (pullExit != 0) {
+                    System.err.println("Git pull --rebase failed with exit code " + pullExit);
+                    // Pop the stash to restore changes even if pull fails
+                    pb.command("git", "stash", "pop");
+                    p = pb.start();
+                    System.out.println("Git stash pop output: " + readProcessOutput(p));
+                    return;
+                }
 
-            // Git pull --rebase
-            String gitToken = System.getenv("GIT_TOKEN");
-            if (gitToken == null || gitToken.isEmpty()) {
-                System.err.println("GIT_TOKEN not set");
-                return;
-            }
-            pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-            p = pb.start();
-            String pullOutput = readProcessOutput(p);
-            int pullExit = p.waitFor();
-            System.out.println("Git pull --rebase output: " + pullOutput);
-            if (pullExit != 0) {
-                System.err.println("Git pull --rebase failed with exit code " + pullExit);
-                return;
-            }
+                // Git add
+                pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
+                p = pb.start();
+                String addOutput = readProcessOutput(p);
+                int addExit = p.waitFor();
+                System.out.println("Git add output: " + addOutput);
+                if (addExit != 0) {
+                    System.err.println("Git add failed with exit code " + addExit);
+                    // Pop the stash to restore changes
+                    pb.command("git", "stash", "pop");
+                    p = pb.start();
+                    System.out.println("Git stash pop output: " + readProcessOutput(p));
+                    return;
+                }
 
-            // Git push
-            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-            p = pb.start();
-            String pushOutput = readProcessOutput(p);
-            int pushExit = p.waitFor();
-            System.out.println("Git push output: " + pushOutput);
-            if (pushExit == 0) {
-                System.out.println("Successfully committed to Git: " + message);
-            } else {
-                System.err.println("Git push failed with exit code " + pushExit);
+                // Git commit
+                pb.command("git", "commit", "-m", message);
+                p = pb.start();
+                String commitOutput = readProcessOutput(p);
+                int commitExit = p.waitFor();
+                System.out.println("Git commit output: " + commitOutput);
+                if (commitExit != 0) {
+                    System.err.println("Git commit failed with exit code " + commitExit);
+                    // Pop the stash to restore changes
+                    pb.command("git", "stash", "pop");
+                    p = pb.start();
+                    System.out.println("Git stash pop output: " + readProcessOutput(p));
+                    return;
+                }
+
+                // Git push
+                pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+                p = pb.start();
+                String pushOutput = readProcessOutput(p);
+                int pushExit = p.waitFor();
+                System.out.println("Git push output: " + pushOutput);
+                if (pushExit == 0) {
+                    System.out.println("Successfully committed to Git: " + message);
+                } else {
+                    System.err.println("Git push failed with exit code " + pushExit);
+                    // Pop the stash to restore changes
+                    pb.command("git", "stash", "pop");
+                    p = pb.start();
+                    System.out.println("Git stash pop output: " + readProcessOutput(p));
+                }
+            } catch (IOException | InterruptedException e) {
+                System.err.println("Git operation failed: " + e.getMessage());
             }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("Git operation failed: " + e.getMessage());
         }
     }
+
 
     private String readProcessOutput(Process process) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
