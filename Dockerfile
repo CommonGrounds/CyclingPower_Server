@@ -24,7 +24,7 @@ RUN mv /app/uploads /data/uploads && ln -s /data/uploads /app/uploads || true
 RUN mv /app/cycling_power.db /data/db/cycling_power.db && ln -s /data/db/cycling_power.db /app/cycling_power.db || true
 # Verify setup
 RUN ls -la /data/json || { echo "data/json folder not found"; exit 1; }
-RUN ls -la /data/images || { echo "data/images folder not found; exit 1; }
+RUN ls -la /data/images || { echo "data/images folder not found"; exit 1; }
 RUN ls -la /data/uploads || { echo "data/uploads folder not found"; exit 1; }
 RUN ls -la /data/db/cycling_power.db || { echo "DB file not found"; exit 1; }
 RUN ls -la /app/.gitignore || { echo ".gitignore not found"; exit 1; }
