@@ -21,13 +21,16 @@ RUN git config --global user.email "java4now@gmail.com" && \
     git config --global user.name "CyclingPower_Server"
 ARG GIT_TOKEN
 RUN if [ -n "$GIT_TOKEN" ]; then \
-        git clone --depth 1 https://x:${GIT_TOKEN}@github.com/CommonGrounds/CyclingPower_Server.git /app/repo && \
+        git clone https://x:${GIT_TOKEN}@github.com/CommonGrounds/CyclingPower_Server.git /app/repo && \
         mv /app/repo/.git /app/.git && \
+        mv /app/repo/.gitignore /app/.gitignore || true && \
+        mv /app/repo/.idea /app/.idea || true && \
         cp -r /app/repo/* /app/ && \
         rm -rf /app/repo || { echo "Git clone failed"; exit 1; }; \
     else \
         echo "GIT_TOKEN not provided, skipping clone"; \
     fi
+RUN git status || { echo "Git status failed"; exit 1; }
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 

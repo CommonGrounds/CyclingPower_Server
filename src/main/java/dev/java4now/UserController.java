@@ -25,14 +25,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
+import java.util.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -40,9 +37,6 @@ import dev.java4now.model.CyclingActivity;
 import dev.java4now.service.FitFileDecoderService;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
 import java.util.stream.Collectors;
 
 
@@ -181,13 +175,19 @@ public class UserController {
             Files.createDirectories(jsonPath.getParent());
 
             // Serialize to JSON using ObjectMapper
-            String jsonContent = objectMapper.writeValueAsString(activity);
-            Files.writeString(jsonPath, jsonContent);
+//            String jsonContent = objectMapper.writeValueAsString(activity);
+//            Files.writeString(jsonPath, jsonContent);
+
+            // Write JSON file with explicit flush - umesto prethodnog
+            try (FileOutputStream fos = new FileOutputStream(jsonPath.toFile())) {
+                objectMapper.writeValue(fos, activity);
+                fos.flush(); // Ensure data is written to disk
+            }
 
             // Save to SQLite - // IMPORTANT SQLLite - dodatak
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
             activityRepository.save(dbActivity);
-            commitToGit("Add FIT and JSON for " + username);
+            commitToGit("Add FIT and JSON for " + username, jsonPath.toString());
 
             Files.deleteIfExists(filePath);
             webSocketHandler.broadcast(jsonFileName);
@@ -349,7 +349,7 @@ private long extractTimestamp(String filename) {
 
     private static final Object GIT_LOCK = new Object();
 
-    private void commitToGit(String message) {
+    private void commitToGit(String message, String... filesToAdd) {
         synchronized (GIT_LOCK) {
             try {
                 ProcessBuilder pb = new ProcessBuilder();
@@ -362,10 +362,19 @@ private long extractTimestamp(String filename) {
                     return;
                 }
 
-                // Log current directory state for debugging
+                // Log current directory state
                 pb.command("ls", "-la", "json", "images", "cycling_power.db");
                 Process p = pb.start();
                 System.out.println("Directory state: " + readProcessOutput(p));
+
+                // Verify specific files exist
+                for (String file : filesToAdd) {
+                    if (Files.exists(Paths.get(file))) {
+                        System.out.println("File exists: " + file);
+                    } else {
+                        System.err.println("File does not exist: " + file);
+                    }
+                }
 
                 // Stash any existing changes
                 pb.command("git", "stash", "push", "--include-untracked");
@@ -396,8 +405,12 @@ private long extractTimestamp(String filename) {
                     return;
                 }
 
-                // Force add all relevant files
-                pb.command("git", "add", "--force", "cycling_power.db", "json/", "images/");
+                // Add specific files and directories
+                List<String> addCommand = new ArrayList<>(Arrays.asList("git", "add", "--force", "cycling_power.db", "json/", "images/"));
+                for (String file : filesToAdd) {
+                    addCommand.add(file);
+                }
+                pb.command(addCommand);
                 p = pb.start();
                 String addOutput = readProcessOutput(p);
                 int addExit = p.waitFor();
@@ -410,14 +423,18 @@ private long extractTimestamp(String filename) {
                     return;
                 }
 
-                // Check if there are changes to commit
+                // Verify staged changes
                 pb.command("git", "status", "--porcelain");
                 p = pb.start();
                 String statusOutput = readProcessOutput(p);
                 int statusExit = p.waitFor();
                 System.out.println("Git status output: " + statusOutput);
                 if (statusOutput.trim().isEmpty()) {
-                    System.out.println("No changes to commit, skipping commit and push");
+                    System.err.println("No changes staged for commit, checking untracked files");
+                    pb.command("git", "ls-files", "--others", "--exclude-standard", "json/", "images/", "cycling_power.db");
+                    p = pb.start();
+                    String untrackedOutput = readProcessOutput(p);
+                    System.out.println("Untracked files: " + untrackedOutput);
                     pb.command("git", "stash", "pop");
                     p = pb.start();
                     System.out.println("Git stash pop output: " + readProcessOutput(p));
@@ -446,6 +463,7 @@ private long extractTimestamp(String filename) {
                 System.out.println("Git push output: " + pushOutput);
                 if (pushExit == 0) {
                     System.out.println("Successfully committed to Git: " + message);
+                    // Only pop stash if push succeeds and no further operations are needed
                 } else {
                     System.err.println("Git push failed with exit code " + pushExit);
                     pb.command("git", "stash", "pop");
