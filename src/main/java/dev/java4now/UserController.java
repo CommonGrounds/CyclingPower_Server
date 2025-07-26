@@ -351,7 +351,7 @@ private long extractTimestamp(String filename) {
         try {
             ProcessBuilder pb = new ProcessBuilder();
             pb.directory(new File("/app"));
-            pb.redirectErrorStream(true); // Merge stdout and stderr
+            pb.redirectErrorStream(true);
 
             // Check if .git exists
             if (!Files.exists(Paths.get("/app/.git"))) {
@@ -381,12 +381,23 @@ private long extractTimestamp(String filename) {
                 return;
             }
 
-            // Git push
+            // Git pull --rebase
             String gitToken = System.getenv("GIT_TOKEN");
             if (gitToken == null || gitToken.isEmpty()) {
                 System.err.println("GIT_TOKEN not set");
                 return;
             }
+            pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pullOutput = readProcessOutput(p);
+            int pullExit = p.waitFor();
+            System.out.println("Git pull --rebase output: " + pullOutput);
+            if (pullExit != 0) {
+                System.err.println("Git pull --rebase failed with exit code " + pullExit);
+                return;
+            }
+
+            // Git push
             pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
             p = pb.start();
             String pushOutput = readProcessOutput(p);

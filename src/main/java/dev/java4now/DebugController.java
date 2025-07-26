@@ -93,12 +93,14 @@ public class DebugController {
             pb.directory(new File("/app"));
             pb.redirectErrorStream(true);
 
+            // Check if .git exists
             if (!Files.exists(Paths.get("/app/.git"))) {
                 System.err.println("Git repository not found in /app");
                 return;
             }
 
-            pb.command("git", "add", "cycling_power.db");
+            // Git add
+            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
             Process p = pb.start();
             String addOutput = readProcessOutput(p);
             int addExit = p.waitFor();
@@ -108,6 +110,7 @@ public class DebugController {
                 return;
             }
 
+            // Git commit
             pb.command("git", "commit", "-m", message);
             p = pb.start();
             String commitOutput = readProcessOutput(p);
@@ -118,11 +121,23 @@ public class DebugController {
                 return;
             }
 
+            // Git pull --rebase
             String gitToken = System.getenv("GIT_TOKEN");
             if (gitToken == null || gitToken.isEmpty()) {
                 System.err.println("GIT_TOKEN not set");
                 return;
             }
+            pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pullOutput = readProcessOutput(p);
+            int pullExit = p.waitFor();
+            System.out.println("Git pull --rebase output: " + pullOutput);
+            if (pullExit != 0) {
+                System.err.println("Git pull --rebase failed with exit code " + pullExit);
+                return;
+            }
+
+            // Git push
             pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
             p = pb.start();
             String pushOutput = readProcessOutput(p);
