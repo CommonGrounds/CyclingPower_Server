@@ -36,8 +36,8 @@ public class DebugController {
     @Autowired
     private DataSource dataSource;
     private static final String JSON_DIR = "/data/json/";
-    private static final String IMAGE_DIR = "/data/images/";
     private static final String UPLOAD_DIR = "/data/uploads/";
+    private static final String IMAGE_DIR = "/data/images/";
     private static final String DB_PATH = "/data/db/cycling_power.db";
     private static final String BACKUP_TOKEN = System.getenv("BACKUP_TOKEN") != null ? System.getenv("BACKUP_TOKEN") : "your-secret-key";
 

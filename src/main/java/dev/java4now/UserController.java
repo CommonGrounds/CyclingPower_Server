@@ -49,8 +49,8 @@ public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
     private static final String JSON_DIR = "/data/json/";
-    private static final String IMAGE_DIR = "/data/images/";
     private static final String UPLOAD_DIR = "/data/uploads/";
+    private static final String IMAGE_DIR = "/data/images/";
     private static final String DB_PATH = "/data/db/cycling_power.db";
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
@@ -177,6 +177,7 @@ public class UserController {
             filePath = uploadPath.resolve(originalFileName);
             System.out.println("[" + requestId + "] Saving .fit file to: " + filePath);
             Files.write(filePath, file.getBytes());
+            System.out.println("[" + requestId + "] .fit file saved, size: " + Files.size(filePath) + " bytes");
 
             // Decode FIT file
             System.out.println("[" + requestId + "] Decoding FIT file");
@@ -188,6 +189,7 @@ public class UserController {
                 System.err.println("[" + requestId + "] Failed to decode FIT file: " + e.getMessage());
                 throw e;
             }
+            System.out.println("[" + requestId + "] FIT file decoded successfully");
 
             // Generate JSON filenames
             long timestamp = System.currentTimeMillis();
@@ -203,21 +205,27 @@ public class UserController {
             try (FileOutputStream fos = new FileOutputStream(jsonPath.toFile())) {
                 objectMapper.writeValue(fos, activity);
                 fos.flush();
-                fos.getFD().sync();
+                // Skip sync to avoid SyncFailedException
+                System.out.println("[" + requestId + "] Primary JSON file written, size: " + Files.size(jsonPath) + " bytes");
             } catch (Exception e) {
                 System.err.println("[" + requestId + "] Failed to write primary JSON file: " + e.getMessage());
+                e.printStackTrace();
                 throw new IOException("Failed to write JSON file", e);
             }
             System.out.println("[" + requestId + "] JSON file saved to: " + jsonPath);
+            System.out.println("[" + requestId + "] JSON directory contents:\n" +
+                    Files.list(Paths.get(JSON_DIR)).map(Path::toString).collect(Collectors.joining("\n")));
 
             // Write master JSON file
             System.out.println("[" + requestId + "] Writing master JSON file: " + masterJsonPath);
             try (FileOutputStream fos = new FileOutputStream(masterJsonPath.toFile())) {
                 objectMapper.writeValue(fos, activity);
                 fos.flush();
-                fos.getFD().sync();
+                // Skip sync
+                System.out.println("[" + requestId + "] Master JSON file written, size: " + Files.size(masterJsonPath) + " bytes");
             } catch (Exception e) {
                 System.err.println("[" + requestId + "] Failed to write master JSON file: " + e.getMessage());
+                e.printStackTrace();
                 throw new IOException("Failed to write master JSON file", e);
             }
             System.out.println("[" + requestId + "] Master JSON file saved to: " + masterJsonPath);
@@ -227,37 +235,41 @@ public class UserController {
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
             try {
                 activityRepository.save(dbActivity);
+                System.out.println("[" + requestId + "] Database save completed");
             } catch (Exception e) {
                 System.err.println("[" + requestId + "] Failed to save to database: " + e.getMessage());
+                e.printStackTrace();
                 throw new RuntimeException("Database save failed", e);
             }
-            System.out.println("[" + requestId + "] Activity saved to database");
 
             // Commit to Git with timeout
             System.out.println("[" + requestId + "] Committing to Git");
             try {
                 ExecutorService executor = Executors.newSingleThreadExecutor();
                 Future<?> future = executor.submit(() -> commitToGit("Add FIT and JSON for " + username, jsonPath.toString(), masterJsonPath.toString()));
-                future.get(30, TimeUnit.SECONDS); // Timeout after 30 seconds
+                future.get(30, TimeUnit.SECONDS);
                 executor.shutdown();
+                System.out.println("[" + requestId + "] Git commit completed");
             } catch (TimeoutException e) {
                 System.err.println("[" + requestId + "] Git commit timed out: " + e.getMessage());
+                e.printStackTrace();
                 throw new RuntimeException("Git commit timed out", e);
             } catch (Exception e) {
                 System.err.println("[" + requestId + "] Git commit failed: " + e.getMessage());
+                e.printStackTrace();
                 throw new RuntimeException("Git commit failed", e);
             }
-            System.out.println("[" + requestId + "] Git commit completed");
 
             // Broadcast via WebSocket
             System.out.println("[" + requestId + "] Broadcasting via WebSocket: " + jsonFileName);
             try {
                 webSocketHandler.broadcast(jsonFileName);
+                System.out.println("[" + requestId + "] WebSocket broadcast completed");
             } catch (Exception e) {
                 System.err.println("[" + requestId + "] WebSocket broadcast failed: " + e.getMessage());
+                e.printStackTrace();
                 // Continue despite WebSocket failure
             }
-            System.out.println("[" + requestId + "] WebSocket broadcast attempted");
 
             return "File processed successfully. JSON generated: " + jsonFileName;
         } catch (Exception e) {
@@ -271,6 +283,7 @@ public class UserController {
                     Files.deleteIfExists(filePath);
                 } catch (IOException e) {
                     System.err.println("[" + requestId + "] Failed to delete temporary file: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
             System.out.println("[" + requestId + "] Upload-fit completed");
