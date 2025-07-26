@@ -48,9 +48,10 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
-    private static final String JSON_DIR = "/app/json/";
-    private static final String UPLOAD_DIR = "/app/uploads/";
-    private static final String IMAGE_DIR = "/app/images/";
+    private static final String JSON_DIR = "/data/json/";
+    private static final String IMAGE_DIR = "/data/images/";
+    private static final String UPLOAD_DIR = "/data/uploads/";
+    private static final String DB_PATH = "/data/db/cycling_power.db";
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
 

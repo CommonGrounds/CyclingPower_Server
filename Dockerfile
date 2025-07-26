@@ -18,7 +18,7 @@ RUN ls -la /app/cycling_power.db || { echo "DB file not found"; exit 1; }
 RUN ls -la /app/json || { echo "json folder not found"; exit 1; }
 RUN ls -la /app/images || { echo "images folder not found"; exit 1; }
 RUN ls -la /app/uploads || { echo "uploads folder not found"; exit 1; }
-RUN ls -la /app/.gitignore || { readProcessOutput(p); }
+RUN ls -la /app/.gitignore || { echo ".gitignore not found"; exit 1; }
 RUN apt-get update && apt-get install -y git sqlite3
 RUN git config --global user.email "java4now@gmail.com" && \
     git config --global user.name "CyclingPower_Server"
