@@ -46,9 +46,9 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
-    private static final String JSON_DIR = "json/"; // Directory to save JSON files on server
-    private static final String UPLOAD_DIR = "uploads/"; // Directory to save .fit files on server
-    private static final String IMAGE_DIR = "images/"; // New directory for images
+    private static final String JSON_DIR = "/app/json/";
+    private static final String UPLOAD_DIR = "/app/uploads/";
+    private static final String IMAGE_DIR = "/app/images/";
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
 
