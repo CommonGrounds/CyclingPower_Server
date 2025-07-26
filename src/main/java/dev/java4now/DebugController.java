@@ -102,9 +102,14 @@ public class DebugController {
                     return;
                 }
 
-                // Stash any existing changes to ensure a clean working directory
-                pb.command("git", "stash", "push", "--include-untracked");
+                // Log current directory state for debugging
+                pb.command("ls", "-la", "json", "images", "cycling_power.db");
                 Process p = pb.start();
+                System.out.println("Directory state: " + readProcessOutput(p));
+
+                // Stash any existing changes
+                pb.command("git", "stash", "push", "--include-untracked");
+                p = pb.start();
                 String stashOutput = readProcessOutput(p);
                 int stashExit = p.waitFor();
                 System.out.println("Git stash output: " + stashOutput);
@@ -125,22 +130,34 @@ public class DebugController {
                 System.out.println("Git pull --rebase output: " + pullOutput);
                 if (pullExit != 0) {
                     System.err.println("Git pull --rebase failed with exit code " + pullExit);
-                    // Pop the stash to restore changes even if pull fails
                     pb.command("git", "stash", "pop");
                     p = pb.start();
                     System.out.println("Git stash pop output: " + readProcessOutput(p));
                     return;
                 }
 
-                // Git add
-                pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
+                // Force add all relevant files
+                pb.command("git", "add", "--force", "cycling_power.db", "json/", "images/");
                 p = pb.start();
                 String addOutput = readProcessOutput(p);
                 int addExit = p.waitFor();
                 System.out.println("Git add output: " + addOutput);
                 if (addExit != 0) {
                     System.err.println("Git add failed with exit code " + addExit);
-                    // Pop the stash to restore changes
+                    pb.command("git", "stash", "pop");
+                    p = pb.start();
+                    System.out.println("Git stash pop output: " + readProcessOutput(p));
+                    return;
+                }
+
+                // Check if there are changes to commit
+                pb.command("git", "status", "--porcelain");
+                p = pb.start();
+                String statusOutput = readProcessOutput(p);
+                int statusExit = p.waitFor();
+                System.out.println("Git status output: " + statusOutput);
+                if (statusOutput.trim().isEmpty()) {
+                    System.out.println("No changes to commit, skipping commit and push");
                     pb.command("git", "stash", "pop");
                     p = pb.start();
                     System.out.println("Git stash pop output: " + readProcessOutput(p));
@@ -155,7 +172,6 @@ public class DebugController {
                 System.out.println("Git commit output: " + commitOutput);
                 if (commitExit != 0) {
                     System.err.println("Git commit failed with exit code " + commitExit);
-                    // Pop the stash to restore changes
                     pb.command("git", "stash", "pop");
                     p = pb.start();
                     System.out.println("Git stash pop output: " + readProcessOutput(p));
@@ -172,7 +188,6 @@ public class DebugController {
                     System.out.println("Successfully committed to Git: " + message);
                 } else {
                     System.err.println("Git push failed with exit code " + pushExit);
-                    // Pop the stash to restore changes
                     pb.command("git", "stash", "pop");
                     p = pb.start();
                     System.out.println("Git stash pop output: " + readProcessOutput(p));
