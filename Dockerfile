@@ -14,6 +14,7 @@ COPY cycling_power.db /app/cycling_power.db
 COPY json /app/json
 COPY images /app/images
 RUN mkdir -p /app/Uploads && chmod -R 755 /app
+RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"
 RUN apt-get update && apt-get install -y git
