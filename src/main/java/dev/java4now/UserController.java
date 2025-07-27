@@ -25,11 +25,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Optional;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -37,8 +40,9 @@ import dev.java4now.model.CyclingActivity;
 import dev.java4now.service.FitFileDecoderService;
 
 import java.time.Instant;
-import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 import java.util.stream.Collectors;
 
 
@@ -48,10 +52,9 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private static final ArrayList<User> users = new ArrayList<>();
-    private static final String JSON_DIR = "/data/json/";
-    private static final String UPLOAD_DIR = "/data/uploads/";
-    private static final String IMAGE_DIR = "/data/images/";
-    private static final String DB_PATH = "/data/db/cycling_power.db";
+    private static final String JSON_DIR = "json/"; // Directory to save JSON files on server
+    private static final String UPLOAD_DIR = "Uploads/"; // Directory to save .fit files on server
+    private static final String IMAGE_DIR = "images/"; // New directory for images
 
     // IMPORTANT - curl http://localhost:8888/api/users - za proveru iz console bez browsera
 
@@ -157,136 +160,40 @@ public class UserController {
             return "User must be logged in to upload files.";
         }
 
-        String requestId = UUID.randomUUID().toString();
-        System.out.println("[" + requestId + "] Starting upload-fit for user: " + authentication.getName());
-
-        String username = authentication.getName();
+        String username = authentication.getName(); // Get the logged-in user's name
         User user = userRepository.findByName(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        Path filePath = null;
+                .orElseThrow(() -> new RuntimeException("User not found"));  // IMPORTANT SQLLite - dodatak
         try {
             // Ensure upload directory exists
             Path uploadPath = Paths.get(UPLOAD_DIR);
-            System.out.println("[" + requestId + "] Ensuring upload directory: " + uploadPath);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // Save the .fit file temporarily
+// Save the .fit file temporarily
             String originalFileName = file.getOriginalFilename();
-            filePath = uploadPath.resolve(originalFileName);
-            System.out.println("[" + requestId + "] Saving .fit file to: " + filePath);
+            Path filePath = uploadPath.resolve(originalFileName);
             Files.write(filePath, file.getBytes());
-            System.out.println("[" + requestId + "] .fit file saved, size: " + Files.size(filePath) + " bytes");
-
-            // Decode FIT file
-            System.out.println("[" + requestId + "] Decoding FIT file");
             File fitFile = filePath.toFile();
-            CyclingActivity activity;
-            try {
-                activity = fitFileDecoderService.decodeFitFile(fitFile);
-            } catch (FitRuntimeException e) {
-                System.err.println("[" + requestId + "] Failed to decode FIT file: " + e.getMessage());
-                throw e;
-            }
-            System.out.println("[" + requestId + "] FIT file decoded successfully");
-
-            // Generate JSON filenames
-            long timestamp = System.currentTimeMillis();
-            String jsonFileName = username + "_" + originalFileName.replace(".fit", "") + "_" + timestamp + ".json";
-            String masterJsonFileName = "master_cycling_activity_" + timestamp + "_" + (timestamp + 20572) + ".json";
-            Path jsonPath = Paths.get(JSON_DIR, jsonFileName);
-            Path masterJsonPath = Paths.get(JSON_DIR, masterJsonFileName);
-            System.out.println("[" + requestId + "] Creating directories for JSON: " + jsonPath.getParent());
+            CyclingActivity activity = fitFileDecoderService.decodeFitFile(fitFile);
+            String jsonFileName = username + "_" + originalFileName.replace(".fit", "") + "_" + System.currentTimeMillis() + ".json";
+            Path jsonPath = Paths.get(JSON_DIR).resolve(jsonFileName);
             Files.createDirectories(jsonPath.getParent());
 
-            // Write primary JSON file
-            System.out.println("[" + requestId + "] Writing primary JSON file: " + jsonPath);
-            try (FileOutputStream fos = new FileOutputStream(jsonPath.toFile())) {
-                objectMapper.writeValue(fos, activity);
-                fos.flush();
-                // Skip sync to avoid SyncFailedException
-                System.out.println("[" + requestId + "] Primary JSON file written, size: " + Files.size(jsonPath) + " bytes");
-            } catch (Exception e) {
-                System.err.println("[" + requestId + "] Failed to write primary JSON file: " + e.getMessage());
-                e.printStackTrace();
-                throw new IOException("Failed to write JSON file", e);
-            }
-            System.out.println("[" + requestId + "] JSON file saved to: " + jsonPath);
-            System.out.println("[" + requestId + "] JSON directory contents:\n" +
-                    Files.list(Paths.get(JSON_DIR)).map(Path::toString).collect(Collectors.joining("\n")));
+            // Serialize to JSON using ObjectMapper
+            String jsonContent = objectMapper.writeValueAsString(activity);
+            Files.writeString(jsonPath, jsonContent);
 
-            // Write master JSON file
-            System.out.println("[" + requestId + "] Writing master JSON file: " + masterJsonPath);
-            try (FileOutputStream fos = new FileOutputStream(masterJsonPath.toFile())) {
-                objectMapper.writeValue(fos, activity);
-                fos.flush();
-                // Skip sync
-                System.out.println("[" + requestId + "] Master JSON file written, size: " + Files.size(masterJsonPath) + " bytes");
-            } catch (Exception e) {
-                System.err.println("[" + requestId + "] Failed to write master JSON file: " + e.getMessage());
-                e.printStackTrace();
-                throw new IOException("Failed to write master JSON file", e);
-            }
-            System.out.println("[" + requestId + "] Master JSON file saved to: " + masterJsonPath);
-
-            // Save to SQLite
-            System.out.println("[" + requestId + "] Saving activity to database");
+            // Save to SQLite - // IMPORTANT SQLLite - dodatak
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
-            try {
-                activityRepository.save(dbActivity);
-                System.out.println("[" + requestId + "] Database save completed");
-            } catch (Exception e) {
-                System.err.println("[" + requestId + "] Failed to save to database: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("Database save failed", e);
-            }
+            activityRepository.save(dbActivity);
+            commitToGit("Add FIT and JSON for " + username);
 
-            // Commit to Git with timeout
-            System.out.println("[" + requestId + "] Committing to Git");
-            try {
-                ExecutorService executor = Executors.newSingleThreadExecutor();
-                Future<?> future = executor.submit(() -> commitToGit("Add FIT and JSON for " + username, jsonPath.toString(), masterJsonPath.toString()));
-                future.get(30, TimeUnit.SECONDS);
-                executor.shutdown();
-                System.out.println("[" + requestId + "] Git commit completed");
-            } catch (TimeoutException e) {
-                System.err.println("[" + requestId + "] Git commit timed out: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("Git commit timed out", e);
-            } catch (Exception e) {
-                System.err.println("[" + requestId + "] Git commit failed: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("Git commit failed", e);
-            }
-
-            // Broadcast via WebSocket
-            System.out.println("[" + requestId + "] Broadcasting via WebSocket: " + jsonFileName);
-            try {
-                webSocketHandler.broadcast(jsonFileName);
-                System.out.println("[" + requestId + "] WebSocket broadcast completed");
-            } catch (Exception e) {
-                System.err.println("[" + requestId + "] WebSocket broadcast failed: " + e.getMessage());
-                e.printStackTrace();
-                // Continue despite WebSocket failure
-            }
-
+            Files.deleteIfExists(filePath);
+            webSocketHandler.broadcast(jsonFileName);
             return "File processed successfully. JSON generated: " + jsonFileName;
-        } catch (Exception e) {
-            System.err.println("[" + requestId + "] Error processing file: " + e.getMessage());
-            e.printStackTrace();
+        } catch (IOException | FitRuntimeException e) {
             return "Failed to process file: " + e.getMessage();
-        } finally {
-            if (filePath != null) {
-                try {
-                    System.out.println("[" + requestId + "] Cleaning up temporary file: " + filePath);
-                    Files.deleteIfExists(filePath);
-                } catch (IOException e) {
-                    System.err.println("[" + requestId + "] Failed to delete temporary file: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-            System.out.println("[" + requestId + "] Upload-fit completed");
         }
     }
 
@@ -440,105 +347,26 @@ private long extractTimestamp(String filename) {
     }
 
 
-
-    private static final Object GIT_LOCK = new Object();
-    private static final ReentrantLock gitLock = new ReentrantLock();
-
-    private void commitToGit(String message, String... filesToAdd) {
-        String requestId = Thread.currentThread().getName() + "-" + UUID.randomUUID().toString();
-        System.out.println("[" + requestId + "] Attempting to acquire Git lock");
+    private void commitToGit(String message) {
         try {
-            if (!gitLock.tryLock(10, TimeUnit.SECONDS)) {
-                System.err.println("[" + requestId + "] Failed to acquire Git lock within 10 seconds");
-                return;
-            }
-            System.out.println("[" + requestId + "] Git lock acquired");
-
             ProcessBuilder pb = new ProcessBuilder();
             pb.directory(new File("/app"));
-            pb.redirectErrorStream(true);
+            pb.redirectErrorStream(true); // Merge stdout and stderr
 
             // Check if .git exists
             if (!Files.exists(Paths.get("/app/.git"))) {
-                System.err.println("[" + requestId + "] Git repository not found in /app");
+                System.err.println("Git repository not found in /app");
                 return;
             }
 
-            // Log current directory state
-            pb.command("ls", "-la", "json/", "images/", "cycling_power.db");
+            // Git add
+            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
             Process p = pb.start();
-            System.out.println("[" + requestId + "] Directory state: " + readProcessOutput(p));
-
-            // Verify files exist
-            for (String filePath : filesToAdd) {
-                Path path = Paths.get(filePath).normalize();
-                System.out.println("[" + requestId + "] File " + path + " exists: " + Files.exists(path));
-            }
-
-            // Wait for filesystem consistency
-            Thread.sleep(1000);
-
-            // Stash changes
-            pb.command("git", "stash", "push", "--include-untracked");
-            p = pb.start();
-            String stashOutput = readProcessOutput(p);
-            int stashExit = p.waitFor();
-            System.out.println("[" + requestId + "] Git stash output: " + stashOutput);
-            if (stashExit != 0) {
-                System.err.println("[" + requestId + "] Git stash failed with exit code " + stashExit);
-            }
-
-            // Git pull --rebase
-            String gitToken = System.getenv("GIT_TOKEN");
-            if (gitToken == null || gitToken.isEmpty()) {
-                System.err.println("[" + requestId + "] GIT_TOKEN not set");
-                return;
-            }
-            pb.command("git", "pull", "--rebase", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
-            p = pb.start();
-            String pullOutput = readProcessOutput(p);
-            int pullExit = p.waitFor();
-            System.out.println("[" + requestId + "] Git pull --rebase output: " + pullOutput);
-            if (pullExit != 0) {
-                System.err.println("[" + requestId + "] Git pull --rebase failed with exit code " + pullExit);
-                pb.command("git", "stash", "pop");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
-                return;
-            }
-
-            // Reset Git index
-            pb.command("git", "reset");
-            p = pb.start();
-            System.out.println("[" + requestId + "] Git reset output: " + readProcessOutput(p));
-
-            // Add all changes
-            pb.command("git", "add", "--force", ".", "cycling_power.db", "json/", "images/");
-            p = pb.start();
             String addOutput = readProcessOutput(p);
             int addExit = p.waitFor();
-            System.out.println("[" + requestId + "] Git add output: " + addOutput);
+            System.out.println("Git add output: " + addOutput);
             if (addExit != 0) {
-                System.err.println("[" + requestId + "] Git add failed with exit code " + addExit);
-                pb.command("git", "stash", "pop");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
-                return;
-            }
-
-            // Verify staged changes
-            pb.command("git", "status", "--porcelain");
-            p = pb.start();
-            String statusOutput = readProcessOutput(p);
-            System.out.println("[" + requestId + "] Git status output: " + statusOutput);
-            if (statusOutput.trim().isEmpty()) {
-                System.err.println("[" + requestId + "] No changes staged for commit");
-                pb.command("git", "ls-files", "--others", "--exclude-standard", "json/", "images/", "cycling_power.db");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Untracked files: " + readProcessOutput(p));
-                pb.command("git", "stash", "pop");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                System.err.println("Git add failed with exit code " + addExit);
                 return;
             }
 
@@ -547,40 +375,32 @@ private long extractTimestamp(String filename) {
             p = pb.start();
             String commitOutput = readProcessOutput(p);
             int commitExit = p.waitFor();
-            System.out.println("[" + requestId + "] Git commit output: " + commitOutput);
+            System.out.println("Git commit output: " + commitOutput);
             if (commitExit != 0) {
-                System.err.println("[" + requestId + "] Git commit failed with exit code " + commitExit);
-                pb.command("git", "stash", "pop");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                System.err.println("Git commit failed with exit code " + commitExit);
                 return;
             }
 
             // Git push
+            String gitToken = System.getenv("GIT_TOKEN");
+            if (gitToken == null || gitToken.isEmpty()) {
+                System.err.println("GIT_TOKEN not set");
+                return;
+            }
             pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
             p = pb.start();
             String pushOutput = readProcessOutput(p);
             int pushExit = p.waitFor();
-            System.out.println("[" + requestId + "] Git push output: " + pushOutput);
+            System.out.println("Git push output: " + pushOutput);
             if (pushExit == 0) {
-                System.out.println("[" + requestId + "] Successfully committed to Git: " + message);
+                System.out.println("Successfully committed to Git: " + message);
             } else {
-                System.err.println("[" + requestId + "] Git push failed with exit code " + pushExit);
-                pb.command("git", "stash", "pop");
-                p = pb.start();
-                System.out.println("[" + requestId + "] Git stash pop output: " + readProcessOutput(p));
+                System.err.println("Git push failed with exit code " + pushExit);
             }
-        } catch (Exception e) {
-            System.err.println("[" + requestId + "] Git operation failed: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            if (gitLock.isHeldByCurrentThread()) {
-                System.out.println("[" + requestId + "] Releasing Git lock");
-                gitLock.unlock();
-            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Git operation failed: " + e.getMessage());
         }
     }
-
 
     private String readProcessOutput(Process process) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
