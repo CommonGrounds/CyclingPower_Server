@@ -387,8 +387,8 @@ private long extractTimestamp(String filename) {
                 System.err.println("GIT_TOKEN not set");
                 return;
             }
-          pb.command("git", "pull", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main"); // TODO
-//            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+//          pb.command("git", "pull", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main"); // TODO
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
             p = pb.start();
             String pushOutput = readProcessOutput(p);
             int pushExit = p.waitFor();
