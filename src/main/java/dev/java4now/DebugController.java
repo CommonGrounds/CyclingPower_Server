@@ -32,7 +32,7 @@ public class DebugController {
     private DataSource dataSource;
 
     @Autowired
-    private GoogleDriveService googleDriveService; // Inject the standalone service
+    private CloudStorageService cloudStorageService; // Inject the standalone service
 
     private static final String JSON_DIR = "/app/json";
     private static final String IMAGE_DIR = "/app/images";
@@ -87,7 +87,7 @@ public class DebugController {
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
         Path dbPath = Paths.get("./cycling_power.db");
         file.transferTo(dbPath);
-        String fileId = googleDriveService.uploadFile(dbPath, "cycling_power.db", "application/x-sqlite3");
+        String fileId = cloudStorageService.uploadFile(dbPath, "cycling_power.db", "application/x-sqlite3");
         return ResponseEntity.ok("Database uploaded to Google Drive with ID: " + fileId);
     }
 

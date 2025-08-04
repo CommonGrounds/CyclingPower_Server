@@ -82,7 +82,7 @@ public class UserController {
     private FitFileDecoderService fitFileDecoderService;
 
     @Autowired
-    private GoogleDriveService googleDriveService; // Inject the standalone service
+    private CloudStorageService cloudStorageService; // Inject the standalone service
 
 
     @PostMapping("/endpoint")
@@ -187,7 +187,7 @@ public class UserController {
             Files.writeString(jsonPath, jsonContent);
 
             // Upload JSON to Google Drive
-            String jsonFileId = googleDriveService.uploadFile(jsonPath, jsonFileName, "application/json");
+            String jsonFileId = cloudStorageService.uploadFile(jsonPath, jsonFileName, "application/json");
 
             // Save to SQLite with Google Drive file ID and upload date
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
@@ -222,7 +222,7 @@ public class UserController {
 
         Path tempPath = Paths.get(JSON_DIR, filename);
         Files.createDirectories(tempPath.getParent());
-        googleDriveService.downloadFile(activity.get().getGoogleDriveFileId(), tempPath);
+        cloudStorageService.downloadFile(activity.get().getGoogleDriveFileId(), tempPath);
 
         Resource resource = new UrlResource(tempPath.toUri());
         if (resource.exists() && resource.isReadable()) {
