@@ -17,7 +17,7 @@ COPY images /app/images
 RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
 EXPOSE 8080
-ENV SPRING_PROFILES_ACTIVE=prod
+#ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_LIBRARY_PATH=/usr/lib
 ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
