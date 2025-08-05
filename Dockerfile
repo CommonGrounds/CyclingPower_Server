@@ -20,6 +20,7 @@ ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_LIBRARY_PATH=/usr/lib
 ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
+
 # Pokrenuti docker service -
 # sudo dockerd
 # Novi terminal, build pa run -
