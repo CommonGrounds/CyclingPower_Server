@@ -110,6 +110,7 @@
             <systemPath>${project.basedir}/src/main/resources/lib/mega.jar</systemPath>
         </dependency>
     </dependencies>
+
     <build>
         <resources>
             <resource>
@@ -144,32 +145,6 @@
                         <goals>
                             <goal>repackage</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.8.0</version>
-                <executions>
-                    <execution>
-                        <id>copy</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>nz.mega</groupId>
-                                    <artifactId>mega-sdk</artifactId>
-                                    <version>3.12.0</version>
-                                    <type>jar</type>
-                                    <overWrite>false</overWrite>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
