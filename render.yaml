@@ -7,10 +7,16 @@ services:
     healthCheckPath: /api/ping
     envVars:
       - key: PORT
-        value: 8080
+        value: 10000
       - key: SERVER_ADDRESS
         value: 0.0.0.0
       - key: JAVA_LIBRARY_PATH
         value: /usr/lib
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:sqlite:file:/app/cycling_power.db
+        value: jdbc:sqlite:/app/cycling_power.db
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: MEGA_EMAIL
+        value: java4now@gmail.com
+      - key: MEGA_PASSWORD
+        value: webfx2048

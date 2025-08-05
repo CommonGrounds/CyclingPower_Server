@@ -17,28 +17,22 @@ public class CloudStorageService {
     private static final String MEGA_EMAIL = System.getenv("MEGA_EMAIL");
     private static final String MEGA_PASSWORD = System.getenv("MEGA_PASSWORD");
     private static final String FOLDER_NAME = "CyclingPowerUploads";
-    private final MegaApi megaApi;
+    private MegaApi megaApi;
 
-    public CloudStorageService() throws IOException {
+    public CloudStorageService() {
         logger.info("Initializing CloudStorageService with MEGA");
         if (MEGA_EMAIL == null || MEGA_PASSWORD == null) {
-            logger.error("MEGA_EMAIL or MEGA_PASSWORD environment variables not set");
-            throw new IOException("MEGA_EMAIL or MEGA_PASSWORD not set");
+            logger.warn("MEGA_EMAIL or MEGA_PASSWORD not set. Cloud storage disabled.");
+            this.megaApi = null;
+            return;
         }
         try {
-            // Load native library
-            try {
-                System.loadLibrary("mega"); // Load libmega.so
-                this.megaApi = new MegaApi(null, "CyclingPowerServer");
-                // Rest of initialization...
-            } catch (UnsatisfiedLinkError e) {
-                logger.error("Failed to load MEGA library. Cloud storage disabled.", e);
-                throw new RuntimeException("MEGA library not found. Check Dockerfile setup.");
-            }
+            System.loadLibrary("mega");
+            this.megaApi = new MegaApi(null, "CyclingPowerServer");
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
             megaApi.login(MEGA_EMAIL, MEGA_PASSWORD, new MegaRequestListener() {
                 @Override
-                public void onRequestFinish(MegaApi api, nz.mega.sdk.MegaRequest request, MegaError error) {
+                public void onRequestFinish(MegaApi api, MegaRequest request, MegaError error) {
                     if (error.getErrorCode() == MegaError.API_OK) {
                         logger.info("MEGA login successful");
                         loginFuture.complete(error);
@@ -50,20 +44,24 @@ public class CloudStorageService {
             });
             loginFuture.get();
             ensureFolderExists();
-        } catch (Exception e) {
-            logger.error("Failed to initialize CloudStorageService: {}", e.getMessage(), e);
-            throw new IOException("Failed to initialize MEGA", e);
+        } catch (UnsatisfiedLinkError | Exception e) {
+            logger.warn("Failed to initialize MEGA. Cloud storage disabled: {}", e.getMessage());
+            this.megaApi = null;
         }
     }
 
     private void ensureFolderExists() throws IOException {
+        if (megaApi == null) {
+            logger.warn("MEGA not initialized. Skipping folder creation.");
+            return;
+        }
         MegaNode root = megaApi.getRootNode();
         MegaNode folder = megaApi.getNodeByPath("/" + FOLDER_NAME, root);
         if (folder == null) {
             CompletableFuture<MegaNode> createFolderFuture = new CompletableFuture<>();
             megaApi.createFolder(FOLDER_NAME, root, new MegaRequestListener() {
                 @Override
-                public void onRequestFinish(MegaApi api, nz.mega.sdk.MegaRequest request, MegaError error) {
+                public void onRequestFinish(MegaApi api, MegaRequest request, MegaError error) {
                     if (error.getErrorCode() == MegaError.API_OK) {
                         createFolderFuture.complete(megaApi.getNodeByPath("/" + FOLDER_NAME, root));
                     } else {
@@ -82,12 +80,16 @@ public class CloudStorageService {
     }
 
     public String uploadFile(Path localPath, String fileName, String mimeType) throws IOException {
+        if (megaApi == null) {
+            logger.warn("Cloud storage is disabled. Skipping upload for {}", fileName);
+            return null; // Store locally or handle differently
+        }
         logger.info("Uploading file {} to MEGA", fileName);
         MegaNode parent = megaApi.getNodeByPath("/" + FOLDER_NAME);
         CompletableFuture<MegaNode> uploadFuture = new CompletableFuture<>();
         megaApi.startUpload(localPath.toString(), parent, fileName, 0, null, false, false, null, new MegaTransferListener() {
             @Override
-            public void onTransferFinish(MegaApi api, nz.mega.sdk.MegaTransfer transfer, MegaError error) {
+            public void onTransferFinish(MegaApi api, MegaTransfer transfer, MegaError error) {
                 if (error.getErrorCode() == MegaError.API_OK) {
                     MegaNode node = megaApi.getNodeByPath("/" + FOLDER_NAME + "/" + fileName);
                     uploadFuture.complete(node);
@@ -99,7 +101,7 @@ public class CloudStorageService {
         });
         try {
             MegaNode node = uploadFuture.get();
-            return String.valueOf(node.getHandle()); // Use handle as file ID
+            return String.valueOf(node.getHandle());
         } catch (Exception e) {
             logger.error("Failed to upload file {}: {}", fileName, e.getMessage(), e);
             throw new IOException("Failed to upload to MEGA", e);
@@ -107,6 +109,10 @@ public class CloudStorageService {
     }
 
     public java.io.File downloadFile(String fileId, Path destination) throws IOException {
+        if (megaApi == null) {
+            logger.warn("Cloud storage is disabled. Cannot download file with ID {}", fileId);
+            throw new IOException("Cloud storage is disabled");
+        }
         logger.info("Downloading file with ID {} to {}", fileId, destination);
         MegaNode node = megaApi.getNodeByHandle(Long.parseLong(fileId));
         if (node == null) {
@@ -117,7 +123,7 @@ public class CloudStorageService {
             Files.createDirectories(destination.getParent());
             megaApi.startDownload(node, destination.toString(), null, null, false, null, 0, 0, false, new MegaTransferListener() {
                 @Override
-                public void onTransferFinish(MegaApi api, nz.mega.sdk.MegaTransfer transfer, MegaError error) {
+                public void onTransferFinish(MegaApi api, MegaTransfer transfer, MegaError error) {
                     if (error.getErrorCode() == MegaError.API_OK) {
                         downloadFuture.complete(error);
                     } else {
