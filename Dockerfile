@@ -17,7 +17,7 @@ RUN apt-get update && \
 
 # Download libmega.so from GitHub Releases
 RUN wget -O /usr/lib/libmega.so \
-    "https://github.com/yourusername/yourrepo/releases/download/v1.0-libmega/libmega.so" && \
+    "https://github.com/CommonGrounds/CyclingPower_Server/releases/download/v1.0-libmega/libmega.so" && \
     chmod +x /usr/lib/libmega.so
 
 # Verify the file exists
