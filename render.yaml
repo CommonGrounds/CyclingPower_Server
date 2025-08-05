@@ -8,7 +8,9 @@ services:
     envVars:
       - key: PORT
         value: 8080
-      - key: SPRING_DATASOURCE_URL
-        value: jdbc:sqlite:file:/app/cycling_power.db
+      - key: SERVER_ADDRESS
+        value: 0.0.0.0
       - key: JAVA_LIBRARY_PATH
         value: /usr/lib
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:sqlite:file:/app/cycling_power.db

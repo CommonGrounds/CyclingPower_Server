@@ -18,7 +18,8 @@ RUN apt-get update && \
 
 # Install gdown and download SQLite driver
 RUN pip3 install gdown && \
-    gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so
+    gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so && \
+                                                                                                     chmod +x /usr/lib/libmega.so
 
 # Copy application files
 COPY --from=build /app/target/*.jar app.jar
@@ -31,9 +32,15 @@ RUN mkdir -p /app/json /app/images /app/Uploads && \
 ENV JAVA_LIBRARY_PATH=/usr/lib
 ENV SPRING_DATASOURCE_URL=jdbc:sqlite:file:/app/cycling_power.db
 
-# Expose and run
+# Explicitly set the server address and port
+ENV SERVER_ADDRESS=0.0.0.0
+ENV PORT=8080
+
+# Expose the port
 EXPOSE 8080
-ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-jar", "app.jar"]
+
+# Run the app with explicit binding
+ENTRYPOINT ["java", "-Djava.library.path=/usr/lib", "-Dserver.address=${SERVER_ADDRESS}", "-Dserver.port=${PORT}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
 # sudo dockerd
