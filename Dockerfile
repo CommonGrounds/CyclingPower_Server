@@ -8,6 +8,7 @@
    FROM openjdk:17-jdk-slim
    WORKDIR /app
    COPY --from=build /app/target/*.jar app.jar
+   COPY --from=build /app/target/lib/mega.jar /app/lib/mega.jar
    RUN apt-get update && apt-get install -y curl libcrypto++-dev python3 python3-pip && rm -rf /var/lib/apt/lists/*
    RUN pip3 install gdown
    RUN gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so
@@ -19,7 +20,7 @@
    EXPOSE 8080
    ENV SPRING_PROFILES_ACTIVE=prod
    ENV JAVA_LIBRARY_PATH=/usr/lib
-   ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
+   ENTRYPOINT ["java", "-cp", "app.jar:/app/lib/mega.jar", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
 # sudo dockerd
