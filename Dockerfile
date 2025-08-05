@@ -8,10 +8,11 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     wget \
+    libatomic1 \
     libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -49,3 +50,8 @@ ENTRYPOINT ["java", "-Djava.library.path=/usr/lib", "-Dserver.address=${SERVER_A
 # Novi terminal, build pa run -
 # sudo docker build -t app .
 # sudo docker run -p 8080:8080 app
+# ili
+# sudo systemctl start docker ili sudo systemctl enable docker
+# docker build -t cycling-app . && docker run --rm -it cycling-app ldd /usr/lib/libmega.so
+# Ctrl + D ili exit
+# sudo systemctl stop docker.socket ili sudo systemctl disable docker.socket
