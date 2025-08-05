@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "CYCLING_ACTIVITY")
 public class CyclingActivityEntity {
 
     @Id
@@ -15,6 +16,7 @@ public class CyclingActivityEntity {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column(name = "FILENAME", nullable = false)
     private String filename;
 
     private String googleDriveFileId;
