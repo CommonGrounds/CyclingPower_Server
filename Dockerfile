@@ -5,21 +5,35 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Runtime stage
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libsqlite3-0 \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install gdown and download SQLite driver
+RUN pip3 install gdown && \
+    gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so
+
+# Copy application files
 COPY --from=build /app/target/*.jar app.jar
-RUN apt-get update && apt-get install -y curl libcrypto++-dev python3 python3-pip && rm -rf /var/lib/apt/lists/*
-RUN pip3 install gdown
-RUN gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so
-COPY cycling_power.db /app/cycling_power.db
-COPY json /app/json
-COPY images /app/images
-RUN mkdir -p /app/Uploads && chmod -R 755 /app
-RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
-EXPOSE 8080
-#ENV SPRING_PROFILES_ACTIVE=prod
+COPY cycling_power.db /app/
+RUN mkdir -p /app/json /app/images /app/Uploads && \
+    chmod -R 755 /app && \
+    chmod 664 /app/cycling_power.db
+
+# Environment variables
 ENV JAVA_LIBRARY_PATH=/usr/lib
-ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
+ENV SPRING_DATASOURCE_URL=jdbc:sqlite:file:/app/cycling_power.db
+
+# Expose and run
+EXPOSE 8080
+ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
 # sudo dockerd

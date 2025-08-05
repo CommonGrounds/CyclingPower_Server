@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: cyclingpower-server
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/ping
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:sqlite:file:/app/cycling_power.db
+      - key: JAVA_LIBRARY_PATH
+        value: /usr/lib
