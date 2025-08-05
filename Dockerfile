@@ -11,15 +11,17 @@ WORKDIR /app
 # Install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    wget \
     libsqlite3-0 \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install gdown and download SQLite driver
-RUN pip3 install gdown && \
-    gdown https://drive.google.com/uc?id=1yHcoc805FJRd-WLlDVaYguL5I8YesWy5 -O /usr/lib/libmega.so && \
-                                                                                                     chmod +x /usr/lib/libmega.so
+# Download libmega.so from GitHub Releases
+RUN wget -O /usr/lib/libmega.so \
+    "https://github.com/yourusername/yourrepo/releases/download/v1.0-libmega/libmega.so" && \
+    chmod +x /usr/lib/libmega.so
+
+# Verify the file exists
+RUN ls -la /usr/lib/libmega.so
 
 # Copy application files
 COPY --from=build /app/target/*.jar app.jar

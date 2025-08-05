@@ -27,8 +27,14 @@ public class CloudStorageService {
         }
         try {
             // Load native library
-            System.loadLibrary("mega");
-            megaApi = new MegaApi(null, "CyclingPowerServer");
+            try {
+                System.loadLibrary("mega"); // Load libmega.so
+                this.megaApi = new MegaApi(null, "CyclingPowerServer");
+                // Rest of initialization...
+            } catch (UnsatisfiedLinkError e) {
+                logger.error("Failed to load MEGA library. Cloud storage disabled.", e);
+                throw new RuntimeException("MEGA library not found. Check Dockerfile setup.");
+            }
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
             megaApi.login(MEGA_EMAIL, MEGA_PASSWORD, new MegaRequestListener() {
                 @Override
