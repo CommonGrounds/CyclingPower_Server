@@ -8,28 +8,116 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-noble
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (from ldd output, adjusted for Ubuntu 24.04)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    software-properties-common && \
-    echo "deb http://archive.ubuntu.com/ubuntu plucky main" >> /etc/apt/sources.list && \
-    apt-get update && \
-    apt-cache search libicu76 && \
     apt-get install -y --no-install-recommends \
     wget \
     libatomic1 \
+    libicu74 \
+    libssl3 \
+    libcrypto++8 \
+    libsodium23 \
     libsqlite3-0 \
-    libicu76 \
-    && rm -rf /var/lib/apt/lists/* && \
-    sed -i '/plucky/d' /etc/apt/sources.list
+    libcurl4 \
+    libmediainfo0v5 \
+    libzen0v5 \
+    libavformat60 \
+    libavutil58 \
+    libavcodec60 \
+    libswscale7 \
+    libswresample4 \
+    libfreeimage3 \
+    libglib2.0-0 \
+    libjpeg8 \
+    libopenjp2-7 \
+    libpng16-16 \
+    libraw23 \
+    libtiff6 \
+    libwebpmux3 \
+    libopenexr-3-1-30 \
+    libimath-3-1-29 \
+    libzstd1 \
+    libtinyxml2-10 \
+    libxml2 \
+    libbz2-1.0 \
+    libgme0 \
+    libopenmpt0t64 \
+    libchromaprint1 \
+    libbluray2 \
+    librabbitmq4 \
+    librist4 \
+    libsrt1.5-gnutls \
+    libzmq5 \
+    libva-drm2 \
+    libva2 \
+    libva-x11-2 \
+    libvdpau1 \
+    libx11-6 \
+    libdrm2 \
+    libvpl2 \
+    libvpx9 \
+    liblzma5 \
+    libdav1d7 \
+    librsvg2-2 \
+    libcairo2 \
+    libzvbi0 \
+    libsnappy1v5 \
+    libaom3 \
+    libcodec2-1.2 \
+    libgsm1 \
+    libjxl0.7 \
+    libmp3lame0 \
+    libopus0 \
+    librav1e0 \
+    libshine3 \
+    libspeex1 \
+    libsvtav1enc1d1 \
+    libtheora0 \
+    libtwolame0 \
+    libvorbis0a \
+    libvorbisenc2 \
+    libwebp7 \
+    libx264-164 \
+    libx265-199 \
+    libxvidcore4 \
+    liblcms2-2 \
+    libgomp1 \
+    liblerc4 \
+    libjbig0 \
+    libdeflate0 \
+    libpcre2-8-0 \
+    libfontconfig1 \
+    libfreetype6 \
+    libudfread0 \
+    libcjson1 \
+    libgpg-error0 \
+    libbsd0 \
+    libsoxr0 \
+    libcairo-gobject2 \
+    libgdk-pixbuf-2.0-0 \
+    libgio-2.0-0 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz0b \
+    libfribidi0 \
+    libthai0 \
+    libgraphite2-3 \
+    libdatrie1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Download libmega.so from GitHub Releases
+# Install libsodium26 manually (from Debian, as in previous setup)
+RUN wget -O /tmp/libsodium26.deb http://deb.debian.org/debian/pool/main/libs/libsodium/libsodium26_1.0.19-1_amd64.deb && \
+    dpkg -i /tmp/libsodium26.deb && \
+    rm /tmp/libsodium26.deb
+
+# Download libmega.so (built without libdeepin-pdfium)
 RUN wget -O /usr/lib/libmega.so \
-    "https://github.com/CommonGrounds/CyclingPower_Server/releases/download/v1.0-libmega/libmega.so" && \
+    "https://github.com/CommonGrounds/CyclingPower_Server/releases/download/v1.1-libmega/libmega.so" && \
     chmod +x /usr/lib/libmega.so
 
-# Verify libmega.so dependencies
-RUN ldd /usr/lib/libmega.so
+# Create debug directory
+RUN mkdir -p /app/debug
 
 # Copy application files
 COPY --from=build /app/target/*.jar app.jar
@@ -37,6 +125,13 @@ COPY cycling_power.db /app/
 RUN mkdir -p /app/json /app/images /app/Uploads && \
     chmod -R 755 /app && \
     chmod 664 /app/cycling_power.db
+
+# Verify libmega.so dependencies and test Java execution
+RUN ldd /usr/lib/libmega.so > /app/debug/ldd_output.txt && \
+    cat /app/debug/ldd_output.txt && \
+    ldconfig && \
+    timeout 30s java -Djava.library.path=/usr/lib -jar /app/app.jar --version > /app/debug/java_test_output.txt 2>&1 || true && \
+    cat /app/debug/java_test_output.txt || true
 
 # Environment variables
 ENV JAVA_LIBRARY_PATH=/usr/lib
