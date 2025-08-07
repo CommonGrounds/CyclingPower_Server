@@ -184,3 +184,5 @@ ENTRYPOINT ["java", "-Djava.library.path=/usr/lib", "-Dserver.address=${SERVER_A
 # sudo docker ps -q | xargs --no-run-if-empty sudo docker stop
 # Then proceed with the rest of the cleanup:
 # sudo docker system prune -a --volumes
+# Test
+# docker run --rm -p 10000:10000 -e SPRING_PROFILES_ACTIVE=prod -e PORT=10000 -e MEGA_EMAIL=java4now@gmail.com -e MEGA_PASSWORD=webfx2048 cycling-app

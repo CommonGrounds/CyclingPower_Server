@@ -11,7 +11,7 @@ services:
       - key: SERVER_ADDRESS
         value: 0.0.0.0
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:h2:mem:cycling_power;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+        value: jdbc:h2:file:/app/db/cycling_power;AUTO_SERVER=TRUE
       - key: SPRING_DATASOURCE_DRIVER_CLASS_NAME
         value: org.h2.Driver
       - key: SPRING_PROFILES_ACTIVE

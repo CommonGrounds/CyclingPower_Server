@@ -35,11 +35,33 @@ public class CloudStorageService {
                 logger.info("libmega.so found at: {}", megaLibPath);
             } else {
                 logger.error("libmega.so not found at: {}", megaLibPath);
+                throw new IOException("libmega.so not found");
             }
-
-            try { Class.forName("MediaInfo"); System.out.println("MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load MediaInfo class: " + e.getMessage()); }
-            try { Class.forName("nz.mega.sdk.MediaInfo"); System.out.println("nz.mega.sdk.MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load nz.mega.sdk.MediaInfo class: " + e.getMessage()); }
-
+            logger.info("Checking for libmediainfo.so in /usr/lib");
+            Path mediainfoLibPath = Path.of("/usr/lib/libmediainfo.so");
+            if (Files.exists(mediainfoLibPath)) {
+                logger.info("libmediainfo.so found at: {}", mediainfoLibPath);
+            } else {
+                logger.warn("libmediainfo.so not found at: {}. Checking /usr/lib/x86_64-linux-gnu", mediainfoLibPath);
+                mediainfoLibPath = Path.of("/usr/lib/x86_64-linux-gnu/libmediainfo.so");
+                if (Files.exists(mediainfoLibPath)) {
+                    logger.info("libmediainfo.so found at: {}", mediainfoLibPath);
+                } else {
+                    logger.error("libmediainfo.so not found at: {}", mediainfoLibPath);
+                    throw new IOException("libmediainfo.so not found");
+                }
+            }
+            logger.info("Checking for MediaInfo class");
+            try {
+                Class.forName("MediaInfo");
+                logger.info("MediaInfo class loaded successfully");
+            } catch (ClassNotFoundException e) {
+                logger.error("MediaInfo class not found: {}", e.getMessage(), e);
+                throw new IOException("MediaInfo class not found", e);
+            }
+            logger.info("Attempting to load libmega.so");
+            System.load("/usr/lib/libmega.so");
+            logger.info("libmega.so loaded successfully");
             this.megaApi = new MegaApi(null, "CyclingPowerServer");
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
             megaApi.login(MEGA_EMAIL, MEGA_PASSWORD, new MegaRequestListener() {
