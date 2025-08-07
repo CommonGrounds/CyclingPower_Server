@@ -27,6 +27,7 @@ public class CloudStorageService {
             return;
         }
         try {
+            System.out.println("java.library.path: " + System.getProperty("java.library.path"));
             System.loadLibrary("mega");
             this.megaApi = new MegaApi(null, "CyclingPowerServer");
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
@@ -42,6 +43,7 @@ public class CloudStorageService {
                     }
                 }
             });
+            System.out.println("MEGA login successful");
             loginFuture.get();
             ensureFolderExists();
         } catch (UnsatisfiedLinkError | Exception e) {

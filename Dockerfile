@@ -2,13 +2,14 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY . .
-RUN mvn clean package -DskipTests
+RUN mvn dependency:resolve && \
+    mvn clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-noble
 WORKDIR /app
 
-# Install system dependencies (from ldd output, adjusted for Ubuntu 24.04)
+# Install system dependencies (reduced list, removing SQLite)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     wget \
@@ -17,7 +18,6 @@ RUN apt-get update && \
     libssl3 \
     libcrypto++8 \
     libsodium23 \
-    libsqlite3-0 \
     libcurl4 \
     libmediainfo0v5 \
     libzen0v5 \
@@ -106,12 +106,12 @@ RUN apt-get update && \
     libdatrie1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install libsodium26 manually (from Debian, as in previous setup)
+# Install libsodium26 manually
 RUN wget -O /tmp/libsodium26.deb http://deb.debian.org/debian/pool/main/libs/libsodium/libsodium26_1.0.19-1_amd64.deb && \
     dpkg -i /tmp/libsodium26.deb && \
     rm /tmp/libsodium26.deb
 
-# Download libmega.so (built without libdeepin-pdfium)
+# Download libmega.so
 RUN wget -O /usr/lib/libmega.so \
     "https://github.com/CommonGrounds/CyclingPower_Server/releases/download/v1.1-libmega/libmega.so" && \
     chmod +x /usr/lib/libmega.so
@@ -121,21 +121,26 @@ RUN mkdir -p /app/debug
 
 # Copy application files
 COPY --from=build /app/target/*.jar app.jar
-COPY cycling_power.db /app/
 RUN mkdir -p /app/json /app/images /app/Uploads && \
-    chmod -R 755 /app && \
-    chmod 664 /app/cycling_power.db
+    chmod -R 755 /app
 
-# Verify libmega.so dependencies and test Java execution
-RUN ldd /usr/lib/libmega.so > /app/debug/ldd_output.txt && \
+# Debug steps
+RUN jar tvf /app/app.jar | grep h2 > /app/debug/jar_contents.txt || true && \
+    cat /app/debug/jar_contents.txt || true && \
+    echo 'public class H2Test { public static void main(String[] args) { try { Class.forName("org.h2.Driver"); System.out.println("H2 Driver loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load H2 Driver: " + e.getMessage()); } } }' > /app/H2Test.java && \
+    javac /app/H2Test.java && \
+    java -cp /app:/app/app.jar -Djava.library.path=/usr/lib H2Test > /app/debug/h2_driver_test.txt 2>&1 || true && \
+    cat /app/debug/h2_driver_test.txt || true && \
+    ldd /usr/lib/libmega.so > /app/debug/ldd_output.txt && \
     cat /app/debug/ldd_output.txt && \
     ldconfig && \
-    timeout 30s java -Djava.library.path=/usr/lib -jar /app/app.jar --version > /app/debug/java_test_output.txt 2>&1 || true && \
+    timeout 30s java -Djava.library.path=/usr/lib -Dspring.profiles.active=prod -jar /app/app.jar > /app/debug/java_test_output.txt 2>&1 || true && \
     cat /app/debug/java_test_output.txt || true
 
 # Environment variables
 ENV JAVA_LIBRARY_PATH=/usr/lib
-ENV SPRING_DATASOURCE_URL=jdbc:sqlite:/app/cycling_power.db
+ENV SPRING_DATASOURCE_URL=jdbc:h2:mem:cycling_power;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV SERVER_ADDRESS=0.0.0.0
 ENV PORT=10000
@@ -143,7 +148,7 @@ ENV PORT=10000
 # Expose the port
 EXPOSE ${PORT}
 
-# Run the app with explicit binding
+# Run the app
 ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.address=${SERVER_ADDRESS}", "-Dserver.port=${PORT}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
@@ -151,7 +156,7 @@ ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.addres
 # Novi terminal, build pa run -
 # sudo docker build -t app .
 # sudo docker run -p 8080:8080 app
-# ili
+# ili run u servisa u pozadini
 # sudo systemctl start docker ili sudo systemctl enable docker
 # docker build -t cycling-app . && docker run --rm -it cycling-app ldd /usr/lib/libmega.so
 # ili # Build the Docker image
@@ -160,3 +165,8 @@ ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.addres
 # docker run -p 8080:10000 -e SPRING_PROFILES_ACTIVE=prod -e PORT=10000 -e MEGA_EMAIL=your_mega_email -e MEGA_PASSWORD=your_mega_password cycling-app
 # Ctrl + D ili exit
 # sudo systemctl stop docker.socket ili sudo systemctl disable docker.socket
+# ciscenje docker trash-a
+# Safely stop all running containers (only if they exist)
+# sudo docker ps -q | xargs --no-run-if-empty sudo docker stop
+# Then proceed with the rest of the cleanup:
+# sudo docker system prune -a --volumes
