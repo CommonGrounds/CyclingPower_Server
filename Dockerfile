@@ -116,21 +116,28 @@ RUN wget -O /usr/lib/libmega.so \
     "https://github.com/CommonGrounds/CyclingPower_Server/releases/download/v1.1-libmega/libmega.so" && \
     chmod +x /usr/lib/libmega.so
 
-# Create debug directory
-RUN mkdir -p /app/debug
+# Create debug and db directories
+RUN mkdir -p /app/debug /app/db && \
+    chmod -R 755 /app
 
 # Copy application files
 COPY --from=build /app/target/*.jar app.jar
-RUN mkdir -p /app/json /app/images /app/Uploads && \
-    chmod -R 755 /app
 
 # Debug steps
+# Add a debug step to confirm libmega.so exists and is accessible:
+RUN ls -l /usr/lib/libmega.so > /app/debug/libmega_info.txt && \
+    cat /app/debug/libmega_info.txt || true
+
 RUN jar tvf /app/app.jar | grep h2 > /app/debug/jar_contents.txt || true && \
     cat /app/debug/jar_contents.txt || true && \
     echo 'public class H2Test { public static void main(String[] args) { try { Class.forName("org.h2.Driver"); System.out.println("H2 Driver loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load H2 Driver: " + e.getMessage()); } } }' > /app/H2Test.java && \
     javac /app/H2Test.java && \
     java -cp /app:/app/app.jar -Djava.library.path=/usr/lib H2Test > /app/debug/h2_driver_test.txt 2>&1 || true && \
     cat /app/debug/h2_driver_test.txt || true && \
+    echo 'public class MegaTest { public static void main(String[] args) { try { System.loadLibrary("mega"); System.out.println("libmega.so loaded successfully"); } catch (UnsatisfiedLinkError e) { System.err.println("Failed to load libmega.so: " + e.getMessage()); } } }' > /app/MegaTest.java && \
+    javac /app/MegaTest.java && \
+    java -cp /app -Djava.library.path=/usr/lib MegaTest > /app/debug/mega_test.txt 2>&1 || true && \
+    cat /app/debug/mega_test.txt || true && \
     ldd /usr/lib/libmega.so > /app/debug/ldd_output.txt && \
     cat /app/debug/ldd_output.txt && \
     ldconfig && \
@@ -138,8 +145,7 @@ RUN jar tvf /app/app.jar | grep h2 > /app/debug/jar_contents.txt || true && \
     cat /app/debug/java_test_output.txt || true
 
 # Environment variables
-ENV JAVA_LIBRARY_PATH=/usr/lib
-ENV SPRING_DATASOURCE_URL=jdbc:h2:mem:cycling_power;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+ENV SPRING_DATASOURCE_URL=jdbc:h2:file:/app/db/cycling_power;AUTO_SERVER=TRUE
 ENV SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.h2.Driver
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV SERVER_ADDRESS=0.0.0.0
@@ -149,7 +155,7 @@ ENV PORT=10000
 EXPOSE ${PORT}
 
 # Run the app
-ENTRYPOINT ["java", "-Djava.library.path=${JAVA_LIBRARY_PATH}", "-Dserver.address=${SERVER_ADDRESS}", "-Dserver.port=${PORT}", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Djava.library.path=/usr/lib", "-Dserver.address=${SERVER_ADDRESS}", "-Dserver.port=${PORT}", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
 # sudo dockerd

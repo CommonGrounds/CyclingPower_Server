@@ -10,10 +10,10 @@ services:
         value: 10000
       - key: SERVER_ADDRESS
         value: 0.0.0.0
-      - key: JAVA_LIBRARY_PATH
-        value: /usr/lib
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:sqlite:/app/cycling_power.db
+        value: jdbc:h2:file:/app/db/cycling_power;AUTO_SERVER=TRUE
+      - key: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+        value: org.h2.Driver
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: MEGA_EMAIL

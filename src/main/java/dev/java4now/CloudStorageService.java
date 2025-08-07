@@ -27,7 +27,15 @@ public class CloudStorageService {
             return;
         }
         try {
-            System.out.println("java.library.path: " + System.getProperty("java.library.path"));
+            String libraryPath = System.getProperty("java.library.path");
+            logger.info("java.library.path: {}", libraryPath);
+            logger.info("Checking for libmega.so in /usr/lib");
+            Path megaLibPath = Path.of("/usr/lib/libmega.so");
+            if (Files.exists(megaLibPath)) {
+                logger.info("libmega.so found at: {}", megaLibPath);
+            } else {
+                logger.error("libmega.so not found at: {}", megaLibPath);
+            }
             System.loadLibrary("mega");
             this.megaApi = new MegaApi(null, "CyclingPowerServer");
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
