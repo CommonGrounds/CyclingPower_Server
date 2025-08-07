@@ -9,7 +9,7 @@ RUN mvn dependency:resolve && \
 FROM eclipse-temurin:17-jre-noble
 WORKDIR /app
 
-# Install system dependencies (reduced list, removing SQLite)
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     wget \
@@ -128,20 +128,24 @@ RUN jar tvf /app/app.jar | grep h2 > /app/debug/jar_contents.txt || true && \
     cat /app/debug/jar_contents.txt || true && \
     jar tvf /app/app.jar | grep mediainfo > /app/debug/mediainfo_jar_contents.txt || true && \
     cat /app/debug/mediainfo_jar_contents.txt || true && \
+    jar tvf /app/app.jar | grep MediaInfo > /app/debug/mediainfo_class_contents.txt || true && \
+    cat /app/debug/mediainfo_class_contents.txt || true && \
     echo 'public class H2Test { public static void main(String[] args) { try { Class.forName("org.h2.Driver"); System.out.println("H2 Driver loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load H2 Driver: " + e.getMessage()); } } }' > /app/H2Test.java && \
     javac /app/H2Test.java && \
     java -cp /app:/app/app.jar -Djava.library.path=/usr/lib H2Test > /app/debug/h2_driver_test.txt 2>&1 || true && \
     cat /app/debug/h2_driver_test.txt || true && \
-    echo 'public class MegaTest { public static void main(String[] args) { try { System.loadLibrary("mega"); System.out.println("libmega.so loaded successfully"); } catch (UnsatisfiedLinkError e) { System.err.println("Failed to load libmega.so: " + e.getMessage()); } } }' > /app/MegaTest.java && \
+    echo 'public class MegaTest { public static void main(String[] args) { try { System.load("/usr/lib/libmega.so"); System.out.println("libmega.so loaded successfully"); } catch (UnsatisfiedLinkError e) { System.err.println("Failed to load libmega.so: " + e.getMessage()); } } }' > /app/MegaTest.java && \
     javac /app/MegaTest.java && \
     java -cp /app:/app/app.jar -Djava.library.path=/usr/lib MegaTest > /app/debug/mega_test.txt 2>&1 || true && \
     cat /app/debug/mega_test.txt || true && \
-    echo 'public class MediaInfoTest { public static void main(String[] args) { try { Class.forName("com.sun.jna.Native"); System.out.println("JNA loaded successfully"); Class.forName("com.mwiede.jna.MediaInfo"); System.out.println("MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load class: " + e.getMessage()); } } }' > /app/MediaInfoTest.java && \
+    echo 'public class MediaInfoTest { public static void main(String[] args) { try { Class.forName("MediaInfo"); System.out.println("MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load MediaInfo class: " + e.getMessage()); } try { Class.forName("nz.mega.sdk.MediaInfo"); System.out.println("nz.mega.sdk.MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load nz.mega.sdk.MediaInfo class: " + e.getMessage()); } System.out.println("Classpath: " + System.getProperty("java.class.path")); } }' > /app/MediaInfoTest.java && \
     javac -cp /app:/app/app.jar /app/MediaInfoTest.java && \
     java -cp /app:/app/app.jar -Djava.library.path=/usr/lib MediaInfoTest > /app/debug/mediainfo_test.txt 2>&1 || true && \
     cat /app/debug/mediainfo_test.txt || true && \
     ldd /usr/lib/libmega.so > /app/debug/ldd_output.txt && \
     cat /app/debug/ldd_output.txt && \
+    ldd /usr/lib/libmediainfo.so > /app/debug/libmediainfo_ldd_output.txt && \
+    cat /app/debug/libmediainfo_ldd_output.txt && \
     ls -l /usr/lib/libmediainfo.so* > /app/debug/libmediainfo_info.txt && \
     cat /app/debug/libmediainfo_info.txt || true && \
     ldconfig && \

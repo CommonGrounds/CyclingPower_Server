@@ -36,7 +36,10 @@ public class CloudStorageService {
             } else {
                 logger.error("libmega.so not found at: {}", megaLibPath);
             }
-            System.loadLibrary("mega");
+
+            try { Class.forName("MediaInfo"); System.out.println("MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load MediaInfo class: " + e.getMessage()); }
+            try { Class.forName("nz.mega.sdk.MediaInfo"); System.out.println("nz.mega.sdk.MediaInfo class loaded successfully"); } catch (ClassNotFoundException e) { System.err.println("Failed to load nz.mega.sdk.MediaInfo class: " + e.getMessage()); }
+
             this.megaApi = new MegaApi(null, "CyclingPowerServer");
             CompletableFuture<MegaError> loginFuture = new CompletableFuture<>();
             megaApi.login(MEGA_EMAIL, MEGA_PASSWORD, new MegaRequestListener() {
