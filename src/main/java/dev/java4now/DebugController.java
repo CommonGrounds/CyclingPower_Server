@@ -17,10 +17,10 @@ import org.springframework.http.MediaType;
 
 import javax.sql.DataSource;
 import java.io.*;
+import java.sql.SQLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -30,10 +30,6 @@ import java.util.zip.ZipOutputStream;
 public class DebugController {
     @Autowired
     private DataSource dataSource;
-
-    @Autowired
-    private CloudStorageService cloudStorageService; // Inject the standalone service
-
     private static final String JSON_DIR = "/app/json";
     private static final String IMAGE_DIR = "/app/images";
     private static final String UPLOAD_DIR = "Uploads/";
@@ -85,32 +81,102 @@ public class DebugController {
 
     @PostMapping("/api/upload-db")
     public ResponseEntity<String> uploadDb(@RequestParam("file") MultipartFile file) throws IOException {
-        Path dbPath = Paths.get("./cycling_power.db");
-        file.transferTo(dbPath);
-        String fileId = cloudStorageService.uploadFile(dbPath, "cycling_power.db", "application/x-sqlite3");
-        return ResponseEntity.ok("Database uploaded to Google Drive with ID: " + fileId);
+        file.transferTo(new File("./cycling_power.db"));
+        commitToGit("Update database");
+        return ResponseEntity.ok("Database uploaded");
     }
+
+
+    private void commitToGit(String message) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.directory(new File("/app"));
+            pb.redirectErrorStream(true);
+
+            if (!Files.exists(Paths.get("/app/.git"))) {
+                System.err.println("Git repository not found in /app");
+                return;
+            }
+
+            pb.command("git", "add", "cycling_power.db");
+            Process p = pb.start();
+            String addOutput = readProcessOutput(p);
+            int addExit = p.waitFor();
+            System.out.println("Git add output: " + addOutput);
+            if (addExit != 0) {
+                System.err.println("Git add failed with exit code " + addExit);
+                return;
+            }
+
+            pb.command("git", "commit", "-m", message);
+            p = pb.start();
+            String commitOutput = readProcessOutput(p);
+            int commitExit = p.waitFor();
+            System.out.println("Git commit output: " + commitOutput);
+            if (commitExit != 0) {
+                System.err.println("Git commit failed with exit code " + commitExit);
+                return;
+            }
+
+            String gitToken = System.getenv("GIT_TOKEN");
+            if (gitToken == null || gitToken.isEmpty()) {
+                System.err.println("GIT_TOKEN not set");
+                return;
+            }
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pushOutput = readProcessOutput(p);
+            int pushExit = p.waitFor();
+            System.out.println("Git push output: " + pushOutput);
+            if (pushExit == 0) {
+                System.out.println("Successfully committed to Git: " + message);
+            } else {
+                System.err.println("Git push failed with exit code " + pushExit);
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Git operation failed: " + e.getMessage());
+        }
+    }
+
+    private String readProcessOutput(Process process) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return output.toString();
+    }
+
 
     @GetMapping("/api/backup-all-json-public")
     public ResponseEntity<Resource> backupAllJsonFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
-        if (token == null || !BACKUP_TOKEN.equals(token)) {
+        System.out.println("Received JSON backup request with token: " + (token != null ? "provided" : "null"));
+        if (!BACKUP_TOKEN.equals(token)) {
             System.out.println("Invalid or missing token for JSON backup");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
         Path jsonDir = Paths.get(JSON_DIR);
-        if (!Files.exists(jsonDir) || !Files.isDirectory(jsonDir)) {
+        System.out.println("Checking JSON directory: " + jsonDir.toAbsolutePath());
+        if (!Files.exists(jsonDir)) {
             System.out.println("JSON directory does not exist: " + jsonDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        if (!Files.isDirectory(jsonDir)) {
+            System.out.println("JSON path is not a directory: " + jsonDir);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
         List<Path> jsonFiles = Files.list(jsonDir)
                 .filter(path -> path.getFileName().toString().endsWith(".json"))
                 .collect(Collectors.toList());
+        System.out.println("Found " + jsonFiles.size() + " JSON files: " + jsonFiles);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             for (Path filePath : jsonFiles) {
+                System.out.println("Adding JSON file: " + filePath);
                 ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
                 zos.putNextEntry(entry);
                 Files.copy(filePath, zos);
@@ -134,24 +200,32 @@ public class DebugController {
 
     @GetMapping("/api/backup-all-images-public")
     public ResponseEntity<Resource> backupAllImageFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
-        if (token == null || !BACKUP_TOKEN.equals(token)) {
+        System.out.println("Received image backup request with token: " + (token != null ? "provided" : "null"));
+        if (!BACKUP_TOKEN.equals(token)) {
             System.out.println("Invalid or missing token for image backup");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
         Path imageDir = Paths.get(IMAGE_DIR);
-        if (!Files.exists(imageDir) || !Files.isDirectory(imageDir)) {
+        System.out.println("Checking image directory: " + imageDir.toAbsolutePath());
+        if (!Files.exists(imageDir)) {
             System.out.println("Image directory does not exist: " + imageDir);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        if (!Files.isDirectory(imageDir)) {
+            System.out.println("Image path is not a directory: " + imageDir);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
         List<Path> imageFiles = Files.list(imageDir)
                 .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
                 .collect(Collectors.toList());
+        System.out.println("Found " + imageFiles.size() + " image files: " + imageFiles);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(baos)) {
             for (Path filePath : imageFiles) {
+                System.out.println("Adding image: " + filePath);
                 ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
                 zos.putNextEntry(entry);
                 Files.copy(filePath, zos);
@@ -175,7 +249,8 @@ public class DebugController {
 
     @GetMapping("/api/list-images-public")
     public ResponseEntity<List<String>> listImagesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
-        if (token == null || !BACKUP_TOKEN.equals(token)) {
+        System.out.println("Received list images request with token: " + (token != null ? "provided" : "null"));
+        if (!BACKUP_TOKEN.equals(token)) {
             System.out.println("Invalid or missing token for list images");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }

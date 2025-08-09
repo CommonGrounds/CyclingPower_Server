@@ -32,7 +32,6 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,12 +77,6 @@ public class UserController {
     @Autowired
     private ObjectMapper objectMapper; // Inject Jackson ObjectMapper
 
-    @Autowired
-    private FitFileDecoderService fitFileDecoderService;
-
-    @Autowired
-    private CloudStorageService cloudStorageService; // Inject the standalone service
-
 
     @PostMapping("/endpoint")
     public ResponseEntity<String> createUser(@RequestBody User user) {
@@ -91,7 +84,7 @@ public class UserController {
         try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             userRepository.save(user);
-            //commitToGit("Add user " + user.getName());
+            commitToGit("Add user " + user.getName());
             return ResponseEntity.ok("User created successfully!");
         } catch (Exception e) {
             System.err.println("Error creating user: " + e.getMessage());
@@ -158,6 +151,8 @@ public class UserController {
     }
 
 
+    @Autowired
+    private FitFileDecoderService fitFileDecoderService;
 
     @PostMapping("/upload-fit")
     public String uploadFitFile(@RequestParam("file") MultipartFile file, Authentication authentication) throws IOException {
@@ -165,15 +160,17 @@ public class UserController {
             return "User must be logged in to upload files.";
         }
 
-        String username = authentication.getName();
+        String username = authentication.getName(); // Get the logged-in user's name
         User user = userRepository.findByName(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));  // IMPORTANT SQLLite - dodatak
         try {
+            // Ensure upload directory exists
             Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
+// Save the .fit file temporarily
             String originalFileName = file.getOriginalFilename();
             Path filePath = uploadPath.resolve(originalFileName);
             Files.write(filePath, file.getBytes());
@@ -183,21 +180,18 @@ public class UserController {
             Path jsonPath = Paths.get(JSON_DIR).resolve(jsonFileName);
             Files.createDirectories(jsonPath.getParent());
 
+            // Serialize to JSON using ObjectMapper
             String jsonContent = objectMapper.writeValueAsString(activity);
             Files.writeString(jsonPath, jsonContent);
 
-            // Upload JSON to Google Drive
-            String jsonFileId = cloudStorageService.uploadFile(jsonPath, jsonFileName, "application/json");
-
-            // Save to SQLite with Google Drive file ID and upload date
+            // Save to SQLite - // IMPORTANT SQLLite - dodatak
             CyclingActivityEntity dbActivity = new CyclingActivityEntity(user, jsonFileName);
-            dbActivity.setGoogleDriveFileId(jsonFileId);
-            dbActivity.setUploadDate(LocalDateTime.now()); // Explicitly set upload date
             activityRepository.save(dbActivity);
+            commitToGit("Add FIT and JSON for " + username);
 
             Files.deleteIfExists(filePath);
             webSocketHandler.broadcast(jsonFileName);
-            return "File processed successfully. JSON uploaded to Google Drive: " + jsonFileName;
+            return "File processed successfully. JSON generated: " + jsonFileName;
         } catch (IOException | FitRuntimeException e) {
             return "Failed to process file: " + e.getMessage();
         }
@@ -205,26 +199,29 @@ public class UserController {
 
 
     @GetMapping("/download-json/{filename}")
-    public ResponseEntity<Resource> downloadJsonFile(@PathVariable String filename, Authentication authentication) throws IOException {
+    public ResponseEntity<Resource> downloadJsonFile(@PathVariable String filename,
+                                                     Authentication authentication) throws IOException {
+//------------------------------- TEST Authentication ---------------------------------
+        /*
+        System.out.println("Authentication: " + (authentication != null ? authentication.getName() : "null"));
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+         */
+//--------------------------------------------------------------------------------------
+
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
         String username = authentication.getName();
         if (!filename.startsWith(username + "_")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null); // User doesn’t own this file
         }
 
-        Optional<CyclingActivityEntity> activity = activityRepository.findByFilename(filename);
-        if (activity.isEmpty() || activity.get().getGoogleDriveFileId() == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        }
+        Path filePath = Paths.get(JSON_DIR).resolve(filename).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
 
-        Path tempPath = Paths.get(JSON_DIR, filename);
-        Files.createDirectories(tempPath.getParent());
-        cloudStorageService.downloadFile(activity.get().getGoogleDriveFileId(), tempPath);
-
-        Resource resource = new UrlResource(tempPath.toUri());
         if (resource.exists() && resource.isReadable()) {
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
@@ -237,14 +234,16 @@ public class UserController {
 
 
     @GetMapping("/list-json")
-    public ResponseEntity<List<String>> listJsonFiles(Authentication authentication) throws IOException {
+    public ResponseEntity<List<String>> listJsonFiles(Authentication authentication) {
+        System.out.println("/list-json - Authentication: " + (authentication != null ? authentication.getName() : "null"));
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
         String username = authentication.getName();
-        List<CyclingActivityEntity> activities = activityRepository.findByUserNameOrderByUploadDateDesc(username);
-        List<String> jsonFiles = activities.stream()
+        // Use the new sorted repository method
+        List<String> jsonFiles = activityRepository.findByUserNameOrderByUploadDateDesc(username)
+                .stream()
                 .map(CyclingActivityEntity::getFilename)
                 .collect(Collectors.toList());
 
@@ -339,7 +338,7 @@ private long extractTimestamp(String filename) {
 
         // Save the image
         Files.write(filePath, imageFile.getBytes());
-        //commitToGit("Add image " + imageFileName);
+        commitToGit("Add image " + imageFileName);
 
         // Optionally broadcast via WebSocket
         webSocketHandler.broadcast("Image uploaded: " + imageFileName);
@@ -348,7 +347,61 @@ private long extractTimestamp(String filename) {
     }
 
 
+    private void commitToGit(String message) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.directory(new File("/app"));
+            pb.redirectErrorStream(true); // Merge stdout and stderr
 
+            // Check if .git exists
+            if (!Files.exists(Paths.get("/app/.git"))) {
+                System.err.println("Git repository not found in /app");
+                return;
+            }
+
+            // Git add
+            pb.command("git", "add", "cycling_power.db", "json/*", "images/*");
+            Process p = pb.start();
+            String addOutput = readProcessOutput(p);
+            int addExit = p.waitFor();
+            System.out.println("Git add output: " + addOutput);
+            if (addExit != 0) {
+                System.err.println("Git add failed with exit code " + addExit);
+                return;
+            }
+
+            // Git commit
+            pb.command("git", "commit", "-m", message);
+            p = pb.start();
+            String commitOutput = readProcessOutput(p);
+            int commitExit = p.waitFor();
+            System.out.println("Git commit output: " + commitOutput);
+            if (commitExit != 0) {
+                System.err.println("Git commit failed with exit code " + commitExit);
+                return;
+            }
+
+            // Git push
+            String gitToken = System.getenv("GIT_TOKEN");
+            if (gitToken == null || gitToken.isEmpty()) {
+                System.err.println("GIT_TOKEN not set");
+                return;
+            }
+//          pb.command("git", "pull", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main"); // TODO
+            pb.command("git", "push", "https://x:" + gitToken + "@github.com/CommonGrounds/CyclingPower_Server.git", "main");
+            p = pb.start();
+            String pushOutput = readProcessOutput(p);
+            int pushExit = p.waitFor();
+            System.out.println("Git push output: " + pushOutput);
+            if (pushExit == 0) {
+                System.out.println("Successfully committed to Git: " + message);
+            } else {
+                System.err.println("Git push failed with exit code " + pushExit);
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Git operation failed: " + e.getMessage());
+        }
+    }
 
     private String readProcessOutput(Process process) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
