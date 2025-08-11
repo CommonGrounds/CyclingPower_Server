@@ -134,6 +134,7 @@ public class FitFileDecoderService {
         return activity;
     }
 
+
     private void saveAsJson(CyclingActivity activity, String fileName) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
         Path jsonPath = Paths.get(JSON_DIR, fileName);
