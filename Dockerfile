@@ -42,4 +42,5 @@ ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 # sudo dockerd
 # Novi terminal, build pa run -
 # sudo docker build -t app .
+# docker run --rm -it app
 # sudo docker run -p 8080:8080 app

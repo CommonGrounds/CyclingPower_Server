@@ -45,6 +45,9 @@ public class CyclingActivity {
         @JsonProperty("calories")
         private int calories; // kcal
 
+        @JsonProperty("temperature")
+        private int temperature; // kcal
+
         // Getters and setters (remove batteryStatus-related methods)
         public long getTimestamp() { return timestamp; }
         public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
@@ -66,6 +69,14 @@ public class CyclingActivity {
         public void setDistance(float distance) { this.distance = distance; }
         public int getCalories() { return calories; }
         public void setCalories(int calories) { this.calories = calories; }
+
+        public int getTemperature() {
+            return temperature;
+        }
+
+        public void setTemperature(int temperature) {
+            this.temperature = temperature;
+        }
     }
 
     public static class SessionData {

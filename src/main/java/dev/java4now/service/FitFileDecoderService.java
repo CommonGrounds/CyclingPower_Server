@@ -59,6 +59,7 @@ public class FitFileDecoderService {
                     record.setGrade(recordMesg.getGrade() != null ? recordMesg.getGrade() : 0.0f); // percent
                     record.setDistance(recordMesg.getDistance() != null ? recordMesg.getDistance() : 0.0f); // meters
                     record.setCalories(recordMesg.getCalories() != null ? recordMesg.getCalories() : 0); // kcal
+                    record.setTemperature(recordMesg.getTemperature() != null ? recordMesg.getTemperature() : 0);
 
                     records.add(record);
                 } else if (mesg.getNum() == MesgNum.SESSION) {
