@@ -86,6 +86,9 @@ public class CyclingActivity {
         @JsonProperty("totalElapsedTime")
         private float totalElapsedTime; // Seconds
 
+        @JsonProperty("movingTime")
+        private float movingTime; // Seconds
+
         @JsonProperty("totalDistance")
         private float totalDistance; // Meters
 
@@ -126,6 +129,14 @@ public class CyclingActivity {
         public void setMaxAltitude(float maxAltitude) { this.maxAltitude = maxAltitude; }
         public float getMinAltitude() { return minAltitude; }
         public void setMinAltitude(float minAltitude) { this.minAltitude = minAltitude; }
+
+        public float getMovingTime() {
+            return movingTime;
+        }
+
+        public void setMovingTime(float movingTime) {
+            this.movingTime = movingTime;
+        }
     }
 
     public static class DeviceInfo {
