@@ -85,7 +85,7 @@ public class FitFileDecoderService {
             sessionData.setStartTime(startTime != null ? startTime.getTimestamp() : 0);
 
             sessionData.setTotalElapsedTime(session.get().getTotalElapsedTime() != null ? session.get().getTotalElapsedTime() : 0.0f);
-            sessionData.setMovingTime(session.get().getTotalMovingTime() != null ? session.get().getTotalMovingTime() : 0.0f);
+            sessionData.setTotalMovingTime(session.get().getTotalMovingTime() != null ? session.get().getTotalMovingTime() : 0.0f);
             sessionData.setTotalDistance(session.get().getTotalDistance() != null ? session.get().getTotalDistance() : 0.0f);
             sessionData.setTotalCalories(session.get().getTotalCalories() != null ? session.get().getTotalCalories() : 0);
 
