@@ -26,6 +26,7 @@ public class FitFileDecoderService {
         List<CyclingActivity.RecordData> records = new ArrayList<>();
         AtomicReference<SessionMesg> session = new AtomicReference<>();
         AtomicReference<DeviceInfoMesg> deviceInfo = new AtomicReference<>();
+        Map<Short, Map<Short, FieldDescriptionMesg>> fieldDescriptions = new HashMap<>();
 
         // Use Decode to read the FIT file
         Decode decode = new Decode();
@@ -38,6 +39,19 @@ public class FitFileDecoderService {
             // Reset the input stream for reading
             fis.getChannel().position(0);
             MesgBroadcaster broadcaster = new MesgBroadcaster();
+
+            // Add listener for field descriptions (for developer fields)
+            broadcaster.addListener((FieldDescriptionMesgListener) fieldDescMesg -> {
+                short devIndex = fieldDescMesg.getDeveloperDataIndex();
+                short fieldNum = fieldDescMesg.getFieldDefinitionNumber();
+                fieldDescriptions.computeIfAbsent(devIndex, k -> new HashMap<>()).put(fieldNum, fieldDescMesg);
+            });
+
+            // Add listener for developer data ID (optional, for completeness)
+            broadcaster.addListener((DeveloperDataIdMesgListener) devDataIdMesg -> {
+                // Can log or process if needed
+            });
+
             broadcaster.addListener((MesgListener) (mesg) -> {
                 if (mesg.getNum() == MesgNum.RECORD) {
                     RecordMesg recordMesg = new RecordMesg(mesg);
@@ -62,6 +76,21 @@ public class FitFileDecoderService {
                     record.setDistance(recordMesg.getDistance() != null ? recordMesg.getDistance() : 0.0f); // meters
                     record.setCalories(recordMesg.getCalories() != null ? recordMesg.getCalories() : 0); // kcal
                     record.setTemperature(recordMesg.getTemperature() != null ? recordMesg.getTemperature() : 0);
+
+                    // Handle developer fields
+                    for (DeveloperField devField : recordMesg.getDeveloperFields()) {
+                        short devIndex = devField.getDeveloperDataIndex();
+                        short fieldNum = devField.getNum();
+                        FieldDescriptionMesg desc = fieldDescriptions.getOrDefault(devIndex, new HashMap<>()).get(fieldNum);
+                        if (desc != null) {
+                            String fieldName = desc.getFieldName((short) 0);
+                            if ("Wind Speed".equals(fieldName)) {
+                                record.setWindSpeed(devField.getFloatValue() != null ? devField.getFloatValue() : 0.0f);
+                            } else if ("Humidity".equals(fieldName)) {
+                                record.setHumidity(devField.getIntegerValue() != null ? devField.getIntegerValue() : 0);
+                            }
+                        }
+                    }
 
                     records.add(record);
                 } else if (mesg.getNum() == MesgNum.SESSION) {
@@ -111,18 +140,6 @@ public class FitFileDecoderService {
             sessionData.setMaxAltitude(maxAltitude != Float.MIN_VALUE ? maxAltitude : 0);
             sessionData.setMinAltitude(minAltitude != Float.MAX_VALUE ? minAltitude : 0);
 
-            // Handle developer fields
-            Map<Short, Map<Short, FieldDescriptionMesg>> fieldDescriptions = new HashMap<>();
-            for (DeveloperField devField : session.get().getDeveloperFields()) {
-                short devIndex = devField.getDeveloperDataIndex();
-                short fieldNum = (short) devField.getNum();
-                if ("Weather".equals(devField.getName())) {
-                    System.out.println("   Weather: " + devField.getStringValue());
-                    sessionData.setWeather(devField.getIntegerValue());
-                }
-//                System.out.println(devIndex + " " + fieldNum + " " + devField.getName() + ": " + devField.getStringValue());
-            }
-
             activity.setSession(sessionData);
         }
 
@@ -133,9 +150,9 @@ public class FitFileDecoderService {
             DateTime timestamp = deviceInfo.get().getTimestamp();
             deviceInfoData.setTimestamp(timestamp != null ? timestamp.getTimestamp() : 0);
 
-            Short batteryLevel = deviceInfo.get().getBatteryStatus();
-            System.out.println(batteryLevel);
-            deviceInfoData.setBatteryLevel(batteryLevel != null ? String.valueOf(batteryLevel) : "UNKNOWN");
+            Short batteryStatus = deviceInfo.get().getBatteryStatus();
+            String batteryStatusStr = batteryStatus != null ? BatteryStatus.getStringFromValue(batteryStatus) : "UNKNOWN";
+            deviceInfoData.setBatteryLevel(batteryStatusStr);
 
             String productName = deviceInfo.get().getProductName();
             deviceInfoData.setProductName(productName != null ? productName : "Unknown Device");

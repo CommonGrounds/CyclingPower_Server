@@ -48,6 +48,12 @@ public class CyclingActivity {
         @JsonProperty("temperature")
         private int temperature; // kcal
 
+        @JsonProperty("windSpeed")
+        private float windSpeed; // m/s
+
+        @JsonProperty("humidity")
+        private int humidity; // %
+
         // Getters and setters (remove batteryStatus-related methods)
         public long getTimestamp() { return timestamp; }
         public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
@@ -76,6 +82,22 @@ public class CyclingActivity {
 
         public void setTemperature(int temperature) {
             this.temperature = temperature;
+        }
+
+        public float getWindSpeed() {
+            return windSpeed;
+        }
+
+        public void setWindSpeed(float windSpeed) {
+            this.windSpeed = windSpeed;
+        }
+
+        public int getHumidity() {
+            return humidity;
+        }
+
+        public void setHumidity(int humidity) {
+            this.humidity = humidity;
         }
     }
 
@@ -110,9 +132,6 @@ public class CyclingActivity {
         @JsonProperty("minAltitude")
         private float minAltitude; // meters
 
-        @JsonProperty("Weather")
-        private int Weather; // meters
-
         // Getters and setters
         public long getStartTime() { return startTime; }
         public void setStartTime(long startTime) { this.startTime = startTime; }
@@ -139,14 +158,6 @@ public class CyclingActivity {
 
         public void setTotalMovingTime(float totalMovingTime) {
             this.totalMovingTime = totalMovingTime;
-        }
-
-        public int getWeather() {
-            return Weather;
-        }
-
-        public void setWeather(int weather) {
-            Weather = weather;
         }
     }
 
