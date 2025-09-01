@@ -111,7 +111,7 @@ public class CyclingActivity {
         private float minAltitude; // meters
 
         @JsonProperty("Weather")
-        private int Weather; // meters
+        private int Weather = 100; // meters
 
         // Getters and setters
         public long getStartTime() { return startTime; }

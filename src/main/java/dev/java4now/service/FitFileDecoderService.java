@@ -117,7 +117,7 @@ public class FitFileDecoderService {
                 short devIndex = devField.getDeveloperDataIndex();
                 short fieldNum = (short) devField.getNum();
                 if ("Weather".equals(devField.getName())) {
-                    System.out.println("   Weather: " + devField.getStringValue());
+//                    System.out.println("   Weather: " + devField.getStringValue());
                     sessionData.setWeather(devField.getIntegerValue());
                 }
 //                System.out.println(devIndex + " " + fieldNum + " " + devField.getName() + ": " + devField.getStringValue());
