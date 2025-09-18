@@ -63,6 +63,22 @@ public class FitFileDecoderService {
                     record.setCalories(recordMesg.getCalories() != null ? recordMesg.getCalories() : 0); // kcal
                     record.setTemperature(recordMesg.getTemperature() != null ? recordMesg.getTemperature() : 0);
 
+                    Map<Short, Map<Short, FieldDescriptionMesg>> fieldDescriptions = new HashMap<>();
+                    for (DeveloperField devField : recordMesg.getDeveloperFields()) {  // IMPORTANT - ZA SESSION
+                        short devIndex = devField.getDeveloperDataIndex();
+                        short fieldNum = (short) devField.getNum();
+                        if ("WindSpeed".equals(devField.getName())) {
+                            record.setWindSpeed(devField.getFloatValue() != null ? devField.getFloatValue() : 0.0f);
+                        }else if ("Rotation".equals(devField.getName())) {
+                            record.setRotation(devField.getIntegerValue() != null ? devField.getIntegerValue() : 0);
+                        }else if ("Direction".equals(devField.getName())) {
+                            record.setDirection(devField.getStringValue() != null ? devField.getStringValue() : "");
+                        }else if ("Heading".equals(devField.getName())) {
+                            record.setHeading(devField.getStringValue() != null ? devField.getStringValue() : "");
+                        }
+//                System.out.println(devIndex + " " + fieldNum + " " + devField.getName() + ": " + devField.getStringValue());
+                    }
+
                     records.add(record);
                 } else if (mesg.getNum() == MesgNum.SESSION) {
                     session.set(new SessionMesg(mesg));
@@ -113,7 +129,7 @@ public class FitFileDecoderService {
 
             // Handle developer fields
             Map<Short, Map<Short, FieldDescriptionMesg>> fieldDescriptions = new HashMap<>();
-            for (DeveloperField devField : session.get().getDeveloperFields()) {
+            for (DeveloperField devField : session.get().getDeveloperFields()) {  // IMPORTANT - ZA SESSION
                 short devIndex = devField.getDeveloperDataIndex();
                 short fieldNum = (short) devField.getNum();
                 if ("Weather".equals(devField.getName())) {

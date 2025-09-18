@@ -78,7 +78,7 @@ public class FitFileDecoderService {
                     record.setTemperature(recordMesg.getTemperature() != null ? recordMesg.getTemperature() : 0);
 
                     // Handle developer fields
-                    for (DeveloperField devField : recordMesg.getDeveloperFields()) {
+                    for (DeveloperField devField : recordMesg.getDeveloperFields()) { // IMPORTANT - ZA RECORD
                         short devIndex = devField.getDeveloperDataIndex();
                         short fieldNum = devField.getNum();
                         FieldDescriptionMesg desc = fieldDescriptions.getOrDefault(devIndex, new HashMap<>()).get(fieldNum);
