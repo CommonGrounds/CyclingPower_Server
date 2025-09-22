@@ -52,7 +52,7 @@ public class CyclingActivity {
         private float windSpeed; // m/s
 
         @JsonProperty("Rotation")
-        private int rotation; // %
+        private int rotation; // deg
 
         @JsonProperty("Direction")
         private String direction; // m/s
