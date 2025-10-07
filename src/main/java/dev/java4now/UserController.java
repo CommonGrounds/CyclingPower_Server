@@ -433,12 +433,25 @@ private long extractTimestamp(String filename) {
         // Check if directory exists before listing
         if (Files.exists(imageDir) && Files.isDirectory(imageDir)) {
             try {
+                String base = jsonFile.replace(".json", "");
                 imageFilenames = Files.list(imageDir)
-                        .filter(path -> path.getFileName().toString().startsWith(jsonFile.replace(".json", "") + "_"))
+                        .filter(path -> path.getFileName().toString().startsWith(base + "_"))
                         .sorted((p1, p2) -> {
-                            String timestamp1 = p1.getFileName().toString().split("_")[3].replace(".jpg", "");
-                            String timestamp2 = p2.getFileName().toString().split("_")[3].replace(".jpg", "");
-                            return Long.compare(Long.parseLong(timestamp2), Long.parseLong(timestamp1));
+                            try {
+                                // Parse index N from filename (after base + "_", before ".")
+                                String name1 = p1.getFileName().toString();
+                                String idxStr1 = name1.substring(base.length() + 1, name1.lastIndexOf("."));
+                                long idx1 = Long.parseLong(idxStr1);
+
+                                String name2 = p2.getFileName().toString();
+                                String idxStr2 = name2.substring(base.length() + 1, name2.lastIndexOf("."));
+                                long idx2 = Long.parseLong(idxStr2);
+
+                                return Long.compare(idx2, idx1);  // Descending: higher N (newer) first
+                            } catch (Exception e) {
+                                // Fallback to alphabetical if parse fails
+                                return p2.getFileName().toString().compareTo(p1.getFileName().toString());
+                            }
                         })
                         .map(path -> path.getFileName().toString())
                         .collect(Collectors.toList());
