@@ -108,12 +108,18 @@ public class FitFileDecoderService {
             sessionData.setTotalCalories(session.get().getTotalCalories() != null ? session.get().getTotalCalories() : 0);
 
             // Calculate aggregates from records
-            float sumCadence = 0, sumPower = 0, sumSpeed = 0;
+            int countNonZeroRecords = 0;
+            float sumCadenceNonZero = 0, sumPower = 0, sumSpeed = 0;
             float maxAltitude = Float.MIN_VALUE, minAltitude = Float.MAX_VALUE;
             int recordCount = records.size();
 
             for (CyclingActivity.RecordData record : records) {
-                sumCadence += record.getCadence();
+                int currentCadence = record.getCadence();
+                // Logika za isključivanje nula:
+                if (currentCadence > 0) {
+                    sumCadenceNonZero += currentCadence; // Sabiramo samo aktivne kadence
+                    countNonZeroRecords++;              // Brojimo samo aktivne zapise
+                }
                 sumPower += record.getPower();
                 sumSpeed += record.getSpeed();
 
@@ -121,7 +127,10 @@ public class FitFileDecoderService {
                 minAltitude = Math.min(minAltitude, record.getAltitude());
             }
 
-            sessionData.setAvgCadence(recordCount > 0 ? sumCadence / recordCount : 0);
+//            sessionData.setAvgCadence(recordCount > 0 ? sumCadence / recordCount : 0);
+            float avgCadenceNonZero = (countNonZeroRecords > 0) ? sumCadenceNonZero / countNonZeroRecords : 0;
+            // ako ima u session ili izracunati prosek - non zero
+            sessionData.setAvgCadence(session.get().getAvgCadence() != null ? session.get().getAvgCadence() : avgCadenceNonZero);
             sessionData.setAvgPower(recordCount > 0 ? sumPower / recordCount : 0);
             sessionData.setAvgSpeed(recordCount > 0 ? sumSpeed / recordCount : 0);
             sessionData.setMaxAltitude(maxAltitude != Float.MIN_VALUE ? maxAltitude : 0);
