@@ -1,8 +1,10 @@
 package dev.java4now;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
@@ -13,7 +15,6 @@ public class SelfPingScheduler {
 
     private final RestTemplate restTemplate;
 
-    // Constructor injection - Spring će automatski inject-ovati RestTemplate
     public SelfPingScheduler(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
@@ -23,17 +24,22 @@ public class SelfPingScheduler {
         try {
             String port = System.getenv("PORT");
             if (port == null) {
-                port = "8080"; // default port za development
+                port = "8080";
             }
 
-            String url = "http://localhost:" + port + "/health";
-            System.out.println("Pinging: " + url);
-
-            String response = restTemplate.getForObject(url, String.class);
-            System.out.println("Self-ping successful: " + response);
+            String response = restTemplate.getForObject(
+                    "http://localhost:" + port + "/health",
+                    String.class
+            );
+            System.out.println("✓ Keep-alive ping successful: " + new Date());
 
         } catch (Exception e) {
-            System.out.println("Self-ping failed: " + e.getMessage());
+            System.out.println("✗ Keep-alive ping failed: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("OK - " + new Date());
     }
 }
