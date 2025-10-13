@@ -44,3 +44,6 @@ ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
 # sudo docker build -t app .
 # docker run --rm -it app
 # sudo docker run -p 8080:8080 app
+# odnosno realna ( prema ovoj konfiguraciji ) lokalna provera
+# docker run -p 8080:10000 -e SPRING_PROFILES_ACTIVE=prod -e PORT=10000 app
+# sa http://localhost:8080/ treba da vrati - Server is running - Mon Oct 13 10:21:53 UTC 2025
