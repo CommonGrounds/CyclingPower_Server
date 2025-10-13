@@ -35,11 +35,16 @@ public class SelfPingScheduler {
 
         } catch (Exception e) {
             System.out.println("✗ Keep-alive ping failed: " + e.getMessage());
-        }
-    }
 
-    @GetMapping("/health")
-    public ResponseEntity<String> healthCheck() {
-        return ResponseEntity.ok("OK - " + new Date());
+            // Probaj i root endpoint kao fallback
+            try {
+                String port = System.getenv("PORT");
+                if (port == null) port = "8080";
+                restTemplate.getForObject("http://localhost:" + port + "/", String.class);
+                System.out.println("✓ Fallback ping successful");
+            } catch (Exception ex) {
+                System.out.println("✗ Fallback ping also failed");
+            }
+        }
     }
 }
