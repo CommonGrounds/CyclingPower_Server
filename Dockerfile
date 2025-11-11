@@ -5,7 +5,7 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Runtime stage
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Explicitly copy DB file
@@ -17,7 +17,8 @@ RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"
-RUN apt-get update && apt-get install -y git
+# RUN apt-get update && apt-get install -y git
+RUN apk update && apk add git
 RUN git config --global user.email "java4now@gmail.com" && \
     git config --global user.name "CyclingPower_Server"
 ARG GIT_TOKEN
@@ -36,9 +37,12 @@ ENV PORT=10000
 # Expose the port
 EXPOSE ${PORT}
 
-ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
+# ENTRYPOINT ["java", "-Dserver.port=${PORT:8080}", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
 
 # Pokrenuti docker service -
+# sudo systemctl start docker
+# ili
 # sudo dockerd
 # Novi terminal, build pa run -
 # sudo docker build -t app .
