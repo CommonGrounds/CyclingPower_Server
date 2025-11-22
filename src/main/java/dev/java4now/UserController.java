@@ -414,10 +414,35 @@ private long extractTimestamp(String filename) {
     }
 
 
+
+    private String getServerBaseUrl(HttpServletRequest request) {
+        String scheme = request.getScheme(); // http ili https
+        String serverName = request.getServerName(); // localhost ili domen
+        int serverPort = request.getServerPort();
+        String contextPath = request.getContextPath();
+
+        // Sastavi base URL
+        StringBuilder url = new StringBuilder();
+        url.append(scheme).append("://").append(serverName);
+
+        // Dodaj port samo ako nije standardni (80 za http, 443 za https)
+        if ((serverPort != 80) && (serverPort != 443)) {
+            url.append(":").append(serverPort);
+        }
+
+        url.append(contextPath);
+
+        return url.toString();
+    }
+
+
+
+
     @GetMapping("/image-for-json/{jsonFile}")
     public ResponseEntity<List<String>> getImageForJson(
             @PathVariable String jsonFile,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request ) {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
@@ -461,11 +486,13 @@ private long extractTimestamp(String filename) {
             }
         }
 
+        String baseUrl = getServerBaseUrl(request);
+
         // Always return 200 OK with an empty list if no images
         List<String> signedUrls = imageFilenames.stream()
                 .map(filename -> {
                     String token = generateToken(username);
-                    return "https://cyclingpower-server-1.onrender.com/api/images/" + filename + "?token=" + token;
+                    return baseUrl + "/api/images/" + filename + "?token=" + token;
                 })
                 .collect(Collectors.toList());
 

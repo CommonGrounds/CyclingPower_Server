@@ -5,7 +5,9 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+# Za najvecu stabilnost u buducnosti koristite fiksiranu verziju
+# FROM eclipse-temurin:17.0.9_9-jre-slim
+FROM eclipse-temurin:17.0.9_9-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Explicitly copy DB file
@@ -17,7 +19,9 @@ RUN mkdir -p /app/Uploads && chmod -R 755 /app
 RUN chmod -R 644 /app/json /app/images && chmod 664 /app/cycling_power.db
 RUN ls -l /app/cycling_power.db || echo "DB file not found"
 RUN ls -l /app/json || echo "json folder not found"
+# za eclipse-temurin:17.0.9_9-jre-slim
 # RUN apt-get update && apt-get install -y git
+# za alpine
 RUN apk update && apk add git
 RUN git config --global user.email "java4now@gmail.com" && \
     git config --global user.name "CyclingPower_Server"
@@ -50,4 +54,8 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 # sudo docker run -p 8080:8080 app
 # odnosno realna ( prema ovoj konfiguraciji ) lokalna provera
 # docker run -p 8080:10000 -e SPRING_PROFILES_ACTIVE=prod -e PORT=10000 app
+# ili
+# docker run -p 8080:10000 --rm -it app
+# --rm: (Preporučeno) Automatski briše kontejner kada ga zaustavite.
+# -it: (Preporučeno) Pokreće kontejner u interaktivnom režimu, što omogućava da vidite logove u realnom vremenu i da ga zaustavite sa Ctrl+C.
 # sa http://localhost:8080/ treba da vrati - Server is running - Mon Oct 13 10:21:53 UTC 2025
