@@ -1,6 +1,7 @@
 package dev.java4now;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,9 @@ import java.util.Date;
 @Component
 public class SelfPingScheduler {
 
+    @Value("${server.port:8080}")
+    private String configuredPort;
+
     private final RestTemplate restTemplate;
 
     public SelfPingScheduler(RestTemplate restTemplate) {
@@ -24,14 +28,14 @@ public class SelfPingScheduler {
         try {
             String port = System.getenv("PORT");
             if (port == null) {
-                port = "8080";
+                port = configuredPort;
             }
 
             String response = restTemplate.getForObject(
                     "http://localhost:" + port + "/health",
                     String.class
             );
-            System.out.println("✓ Keep-alive ping successful: " + new Date());
+            System.out.println("✓ Keep-alive ping successful: " + "PORT:" + port + " - " + new Date());
 
         } catch (Exception e) {
             System.out.println("✗ Keep-alive ping failed: " + e.getMessage());

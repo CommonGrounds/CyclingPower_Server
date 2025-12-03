@@ -50,7 +50,7 @@ public class SecurityConfig {
                 "https://cyclingpower-web.onrender.com", // WebFX frontend
                 "http://localhost:63342", // Local WebFX dev
                 "http://127.0.0.1:9876",  // Other local dev
-                "http://localhost:8880"    // Spring Boot dev
+                "http://localhost:8080"    // Spring Boot dev
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

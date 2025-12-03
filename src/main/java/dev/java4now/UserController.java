@@ -493,6 +493,7 @@ private long extractTimestamp(String filename) {
                 .map(filename -> {
                     String token = generateToken(username);
                     return baseUrl + "/api/images/" + filename + "?token=" + token;
+//                  return "https://cyclingpower-server-1.onrender.com/api/images/" + filename + "?token=" + token;
                 })
                 .collect(Collectors.toList());
 
