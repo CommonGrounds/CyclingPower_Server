@@ -1,5 +1,6 @@
 package dev.java4now.service;
 
+import dev.java4now.Filters.LowPassFilter;
 import dev.java4now.model.CyclingActivity;
 import com.garmin.fit.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +22,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public class FitFileDecoderService {
 
     private static final String JSON_DIR = "json/"; // Directory to save JSON files on server
+    // balans između glatkoće i kašnjenja (lag).
+    //Mali alpha (npr. 0.05): Podaci su jako glatki, ali grafikon "kasni" za stvarnim događajem (npr. ti si već stao, a brzina na grafiku još uvek polako opada).
+    //Veliki alpha (npr. 0.8): Brzo reaguje na promene, ali zadržava dosta šuma.
+    // Za brzinu - balansirana reakcija
+    LowPassFilter speedFilter = new LowPassFilter(0.15);
+    // Za snagu - jače filtriranje jer je procena "skakutava"
+    LowPassFilter powerFilter = new LowPassFilter(0.05);
 
     public CyclingActivity decodeFitFile(File fitFile) throws FitRuntimeException, IOException {
         List<CyclingActivity.RecordData> records = new ArrayList<>();
@@ -54,8 +62,8 @@ public class FitFileDecoderService {
                     record.setLongitude(lon != null ? lon / (Math.pow(2, 31) / 180.0) : 0.0);
 
                     // Other fields (removed batteryStatus)
-                    record.setSpeed(recordMesg.getSpeed() != null ? recordMesg.getSpeed() : 0.0f); // m/s
-                    record.setPower(recordMesg.getPower() != null ? recordMesg.getPower() : 0); // watts
+                    record.setSpeed(recordMesg.getSpeed() != null ? (float) speedFilter.filter(recordMesg.getSpeed()) : 0.0f); // m/s
+                    record.setPower(recordMesg.getPower() != null ? (int) powerFilter.filter(recordMesg.getPower()) : 0); // watts
                     record.setCadence(recordMesg.getCadence() != null ? recordMesg.getCadence() : 0); // rpm
                     record.setAltitude(recordMesg.getAltitude() != null ? recordMesg.getAltitude() : 0.0f); // meters
                     record.setGrade(recordMesg.getGrade() != null ? recordMesg.getGrade() : 0.0f); // percent
