@@ -1,5 +1,6 @@
 package dev.java4now;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
@@ -198,54 +199,65 @@ public class DebugController {
                 .body(resource);
     }
 
+
     @GetMapping("/api/backup-all-images-public")
-    public ResponseEntity<Resource> backupAllImageFilesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
-        System.out.println("Received image backup request with token: " + (token != null ? "provided" : "null"));
+    public void backupAllImageFilesPublic(
+            @RequestParam(value = "token", required = false) String token,
+            HttpServletResponse response) throws IOException {
+
         if (!BACKUP_TOKEN.equals(token)) {
-            System.out.println("Invalid or missing token for image backup");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or missing token");
+            return;
         }
 
         Path imageDir = Paths.get(IMAGE_DIR);
-        System.out.println("Checking image directory: " + imageDir.toAbsolutePath());
-        if (!Files.exists(imageDir)) {
-            System.out.println("Image directory does not exist: " + imageDir);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        }
-        if (!Files.isDirectory(imageDir)) {
-            System.out.println("Image path is not a directory: " + imageDir);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        if (!Files.exists(imageDir) || !Files.isDirectory(imageDir)) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Image directory not found");
+            return;
         }
 
         List<Path> imageFiles = Files.list(imageDir)
-                .filter(path -> path.getFileName().toString().matches(".*\\.(jpg|png|jpeg)"))
+                .filter(p -> {
+                    String name = p.getFileName().toString().toLowerCase();
+                    return name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png");
+                })
                 .collect(Collectors.toList());
-        System.out.println("Found " + imageFiles.size() + " image files: " + imageFiles);
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+        if (imageFiles.isEmpty()) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "No images found");
+            return;
+        }
+
+        // Postavi header-e
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename=\"all_images_backup_public.zip\"");
+        // Opcionalno: response.setHeader("Cache-Control", "no-cache");
+
+        try (OutputStream out = response.getOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(out))) {
+
             for (Path filePath : imageFiles) {
-                System.out.println("Adding image: " + filePath);
-                ZipEntry entry = new ZipEntry(filePath.getFileName().toString());
+                String fileName = filePath.getFileName().toString();
+                // Možeš dodati i putanju ako želiš foldere: String entryName = "images/" + fileName;
+
+                ZipEntry entry = new ZipEntry(fileName);
                 zos.putNextEntry(entry);
-                Files.copy(filePath, zos);
+
+                Files.copy(filePath, zos);          // ← stream direktno na disk → heap gotovo netaknut
+
                 zos.closeEntry();
             }
-            zos.finish();
-        }
 
-        byte[] zipBytes = baos.toByteArray();
-        if (zipBytes.length == 0) {
-            System.out.println("No image files found, returning 404");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            zos.finish();   // flush i finalizacija
+            // ne treba closeEntry nakon finish-a
+        } catch (IOException e) {
+            // Loguj grešku, ali nemoj slati response ponovo – već je u toku
+            System.out.println("Greška pri stream-ovanju ZIP backup-a");
+            // Ako želiš, možeš pokušati response.reset() i poslati error, ali često je kasno
         }
-
-        Resource resource = new ByteArrayResource(zipBytes);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=all_images_backup_public.zip")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
     }
+
+
 
     @GetMapping("/api/list-images-public")
     public ResponseEntity<List<String>> listImagesPublic(@RequestParam(value = "token", required = false) String token) throws IOException {
