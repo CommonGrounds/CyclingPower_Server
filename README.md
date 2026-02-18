@@ -43,7 +43,7 @@
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/CommonGrounds/CyclingPower_Backend.git
+git clone https://github.com/CommonGrounds/CyclingPower_Server.git
 
 ```
 
