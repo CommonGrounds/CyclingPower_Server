@@ -1,60 +1,75 @@
-# CyclingPower Spring server
+# Cycle Power Backend
 
-## Documentation
+**Cycle Power Backend** is the central data processing engine of the Cycle Power ecosystem. It acts as a bridge between the native mobile application and the web-based analytics dashboard, handling file storage, data transformation, and persistent storage.
 
-Read how to create Gluon samples step by step [here](https://docs.gluonhq.com/samples)
+---
 
-## Quick Instructions
+## ⚙️ Core Responsibilities
 
-We use [GluonFX plugin](https://docs.gluonhq.com/) to build a native image for platforms including desktop, android and iOS.
-Please follow the prerequisites as stated [here](https://docs.gluonhq.com/#_requirements).
+* **FIT File Processing:** Ingests binary `.fit` files (standard cycling format) uploaded from the mobile app and parses them into structured JSON for web consumption.
+* **RESTful API:** Provides secure endpoints for data synchronization between the GluonFX mobile client and the WebFX frontend.
+* **Persistent Storage:** Manages a lightweight yet robust **SQLite** database to store user sessions, ride metrics, and historical data.
+* **Data Transformation:** Converts raw sensor data into optimized formats for real-time charting and long-term analytics.
 
-### Desktop
+---
 
-Run the application on JVM/HotSpot:
+## 🛠 Tech Stack
 
-    mvn gluonfx:run
+* **Java 17+**
+* **Spring Boot 3.x:** Core framework for the REST API and service layer.
+* **SQLite:** Efficient, file-based relational database for seamless deployment.
+* **Spring Data JPA:** For clean and maintainable database abstraction.
+* **FIT SDK:** Integrated logic for parsing Garmin/ANT+ standard fitness files.
 
-Run the application and explore all scenarios to generate config files for the native image with:
+---
 
-    mvn gluonfx:runagent
+## 📂 System Flow
 
-Build a native image using:
+1. **Upload:** Mobile app (GluonFX) sends a `.fit` file via a POST request.
+2. **Process:** The server parses the binary data, extracts GPS, Cadence, and Power metrics.
+3. **Store:** Metadata and session summaries are saved in **SQLite**.
+4. **Serve:** The Web Dashboard (WebFX) fetches the processed JSON to render interactive charts.
 
-    mvn gluonfx:build
+---
 
-Run the native image app:
+## 🚀 Getting Started
 
-    mvn gluonfx:nativerun
+### Prerequisites
 
-### Android
+* JDK 17 or higher
+* Maven
 
-Build a native image for Android using:
+### Installation & Run
 
-    mvn gluonfx:build -Pandroid
+1. Clone the repository:
+```bash
+git clone https://github.com/CommonGrounds/CyclingPower_Backend.git
 
-Package the native image as an 'apk' file:
+```
 
-    mvn gluonfx:package -Pandroid
 
-Install it on a connected android device:
+2. Run the application:
+```bash
+mvn spring-boot:run
 
-    mvn gluonfx:install -Pandroid
+```
 
-Run the installed app on a connected android device:
 
-    mvn gluonfx:nativerun -Pandroid
 
-### iOS
+The server will start on `http://localhost:8080` by default.
 
-Build a native image for iOS using:
+---
 
-    mvn gluonfx:build -Pios
+## 🌐 Deployment
 
-Install and run the native image on a connected iOS device:
+The production API is currently hosted on **Render.com**.
 
-    mvn gluonfx:nativerun -Pios
+> **API Base URL:** `https://cyclingpower-server-1.onrender.com`
+> *(Note: As it is on a free tier, the first request may take up to 30 seconds to wake up the instance.)*
 
-Create an IPA file (for submission to TestFlight or App Store):
+---
 
-    mvn gluonfx:package -Pios
+## 🔗 Part of the Ecosystem
+
+* **[Cycle Power Mobile](https://github.com/CommonGrounds/CyclingPower_Mobile):** Native mobile recording app.
+* **[Cycle Power Web](https://github.com/CommonGrounds/CyclingPower):** WebFX-based visualization dashboard.
