@@ -31,12 +31,16 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
 
     // Метод за слање порука свим клијентима
     public void broadcast(String message) {
+        TextMessage textMessage = new TextMessage(message);
         for (WebSocketSession session : sessions) {
             if (session.isOpen()) {
-                try {
-                    session.sendMessage(new TextMessage(message));
-                } catch (IOException e) {
-                    e.printStackTrace();
+                synchronized (session) {  // ← ključna izmena - Ako je Upload slike spor (velika slika → duže procesiranje), pa mora se ovo sinhronizirati:
+                    try {
+                        session.sendMessage(textMessage);
+                    } catch (IOException e) {
+                        sessions.remove(session); // ukloni pokvarenu sesiju
+                        e.printStackTrace();
+                    }
                 }
             }
         }
