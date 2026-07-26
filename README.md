@@ -73,3 +73,11 @@ The production API is currently hosted on **Render.com**.
 
 * **[Cycle Power Mobile](https://github.com/CommonGrounds/CyclingPower_Mobile):** Native mobile recording app.
 * **[Cycle Power Web](https://github.com/CommonGrounds/CyclingPower):** WebFX-based visualization dashboard.
+
+
+## 📄 License
+
+
+> This project is licensed under the Apache 2.0 License.See `LICENSE` for more information.
+
+---
